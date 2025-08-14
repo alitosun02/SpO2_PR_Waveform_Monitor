@@ -58,9 +58,9 @@ private slots:
 
         // Biolight SPO2 paketi için kontrol (Kod 21, LEN 10)
         if (code == 21 && len == 10) {
-            quint8 spo2   = static_cast<quint8>(packet[6]); // Byte 3: Spo2 aralığı
-            quint8 pr_msb = static_cast<quint8>(packet[7]); // Byte 4: Nabız hızı MSB
-            quint8 pr_lsb = static_cast<quint8>(packet[8]); // Byte 5: Nabız hızı LSB
+            quint8 spo2   = static_cast<quint8>(packet[7]); // Byte 3: Spo2 aralığı
+            quint8 pr_msb = static_cast<quint8>(packet[8]); // Byte 4: Nabız hızı MSB
+            quint8 pr_lsb = static_cast<quint8>(packet[9]); // Byte 5: Nabız hızı LSB
             int pr = (pr_msb << 8) | pr_lsb;
 
             // Değerlerin geçersiz olup olmadığını kontrol etme
