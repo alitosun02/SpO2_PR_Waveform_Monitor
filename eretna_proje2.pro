@@ -1,4 +1,5 @@
 QT += core serialport
+QT += quick qml
 CONFIG += console c++11
 SOURCES += main.cpp \
     reader.cpp
@@ -10,3 +11,10 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     reader.h
+
+DISTFILES += \
+    main.qml
+
+RESOURCES += \
+    qml.qrc
+

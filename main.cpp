@@ -1,11 +1,24 @@
-#include <QCoreApplication>
-#include <QDebug>
-#include <qTimer>
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include "reader.h"
+#include <QDebug>
 
 int main(int argc, char *argv[]) {
-    QCoreApplication a(argc, argv);
-    Reader r("COM8"); // Port adı buradan değiştirilebilir
-    QTimer::singleShot(1000, &a, &QCoreApplication::quit); // 1 saniye sonra kapan
-    return a.exec();
+    QGuiApplication app(argc, argv);
+
+    QQmlApplicationEngine engine;
+
+    // Reader nesnesini oluştur
+    Reader r("COM8");
+
+    // Reader’ı QML'e tanıt
+    engine.rootContext()->setContextProperty("reader", &r);
+
+    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
+
+    if (engine.rootObjects().isEmpty())
+        return -1;
+
+    return app.exec();
 }

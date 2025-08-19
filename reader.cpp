@@ -61,15 +61,18 @@ void Reader::processPacket(const QByteArray &packet) {
         int pr = (pr_msb << 8) | pr_lsb;
 
         if (spo2 == 127) {
-            qDebug() << "SpO2: Geçersiz";
+            m_spo2 = -1;
         } else {
-            qDebug().nospace() << "SpO2: " << spo2 << " %";
+            m_spo2 = spo2;
         }
+        emit spo2Changed();
 
         if (pr == 255) {
-            qDebug() << "PR: Geçersiz";
+            m_pr = -1;
         } else {
-            qDebug().nospace() << "PR: " << pr << " bpm";
+            m_pr = pr;
         }
+        emit prChanged();
     }
 }
+
