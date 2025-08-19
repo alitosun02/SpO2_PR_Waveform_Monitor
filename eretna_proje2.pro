@@ -1,5 +1,6 @@
 QT += core serialport
 QT += quick qml
+QT += quick charts serialport
 CONFIG += console c++11
 SOURCES += main.cpp \
     reader.cpp
