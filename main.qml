@@ -82,6 +82,5 @@ ApplicationWindow {
                 function onWaveformChanged() { waveformCanvas.requestPaint() }
             }
         }
-
     }
 }

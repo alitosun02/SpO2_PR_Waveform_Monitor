@@ -56,13 +56,16 @@ void Reader::processPacket(const QByteArray &packet) {
 
     if (code == 21 && len == 10) {
         // waveform
-        quint8 waveform = static_cast<quint8>(packet[6]);
+        quint8 waveform = static_cast<quint8>(packet[5]);
         if (waveform != 127) {
-            m_waveform.append(waveform);
+            static int lastValue = 0;
+            int smooth = (lastValue + waveform) / 2; // basit ortalama
+            lastValue = smooth;
+
+            m_waveform.append(smooth);
             if (m_waveform.size() > 200)
                 m_waveform.removeFirst();
             emit waveformChanged();
-
         }
 
         // SPO2
