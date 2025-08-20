@@ -55,11 +55,18 @@ void Reader::processPacket(const QByteArray &packet) {
     if (sum != static_cast<quint8>(packet[packet.size()-1])) return;
 
     if (code == 21 && len == 10) {
-        quint8 spo2   = static_cast<quint8>(packet[7]);
-        quint8 pr_msb = static_cast<quint8>(packet[8]);
-        quint8 pr_lsb = static_cast<quint8>(packet[9]);
-        int pr = (pr_msb << 8) | pr_lsb;
+        // waveform
+        quint8 waveform = static_cast<quint8>(packet[6]);
+        if (waveform != 127) {
+            m_waveform.append(waveform);
+            if (m_waveform.size() > 200)
+                m_waveform.removeFirst();
+            emit waveformChanged();
 
+        }
+
+        // SPO2
+        quint8 spo2   = static_cast<quint8>(packet[7]);
         if (spo2 == 127) {
             m_spo2 = -1;
         } else {
@@ -67,6 +74,10 @@ void Reader::processPacket(const QByteArray &packet) {
         }
         emit spo2Changed();
 
+        // PR
+        quint8 pr_msb = static_cast<quint8>(packet[8]);
+        quint8 pr_lsb = static_cast<quint8>(packet[9]);
+        int pr = (pr_msb << 8) | pr_lsb;
         if (pr == 255) {
             m_pr = -1;
         } else {
@@ -75,4 +86,3 @@ void Reader::processPacket(const QByteArray &packet) {
         emit prChanged();
     }
 }
-

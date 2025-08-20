@@ -1,7 +1,9 @@
 QT += core serialport
 QT += quick qml
 QT += quick charts serialport
+QT += quick quickcontrols2 serialport
 CONFIG += console c++11
+CONFIG += qml_debug
 SOURCES += main.cpp \
     reader.cpp
 
