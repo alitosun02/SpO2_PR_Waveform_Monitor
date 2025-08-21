@@ -11,6 +11,28 @@ ApplicationWindow {
         anchors.centerIn: parent
         spacing: 20
 
+        Row {
+            spacing: 10
+
+            TextField {
+                id: firstNameField
+                placeholderText: "Ad"
+            }
+            TextField {
+                id: lastNameField
+                placeholderText: "Soyad"
+            }
+            Button {
+                text: "Kaydet"
+                onClicked: {
+                    dbManager.addPatient(firstNameField.text, lastNameField.text);
+                    firstNameField.text = "";
+                    lastNameField.text = "";
+                }
+            }
+        }
+
+
         // üstte yan yana barlar
         Row {
             spacing: 20

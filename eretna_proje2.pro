@@ -2,9 +2,11 @@ QT += core serialport
 QT += quick qml
 QT += quick charts serialport
 QT += quick quickcontrols2 serialport
-CONFIG += console c++11
+QT += sql
+CONFIG += console c++17
 CONFIG += qml_debug
 SOURCES += main.cpp \
+    databasemanager.cpp \
     reader.cpp
 
 # Default rules for deployment.
@@ -13,6 +15,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    databasemanager.h \
     reader.h
 
 DISTFILES += \
