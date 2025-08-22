@@ -11,73 +11,57 @@ ApplicationWindow {
         anchors.centerIn: parent
         spacing: 20
 
+        // HASTA EKLEME FORMU
         Row {
             spacing: 10
-
-            TextField {
-                id: firstNameField
-                placeholderText: "Ad"
-            }
-            TextField {
-                id: lastNameField
-                placeholderText: "Soyad"
-            }
+            TextField { id: firstNameField; placeholderText: "Ad" }
+            TextField { id: lastNameField; placeholderText: "Soyad" }
             Button {
-                text: "Kaydet"
+                text: "Hasta Kaydet"
                 onClicked: {
-                    dbManager.addPatient(firstNameField.text, lastNameField.text);
-                    firstNameField.text = "";
-                    lastNameField.text = "";
+                    console.log("Ad:", firstNameField.text, "Soyad:", lastNameField.text)
+                    if (dbManager.addPatient(firstNameField.text || "", lastNameField.text || "")) {
+                        console.log("Hasta kaydedildi")
+                    } else {
+                        console.log("Hasta kaydı başarısız!")
+                    }
                 }
             }
         }
 
-
-        // üstte yan yana barlar
+        // SPO2 & PR BARLARI
         Row {
             spacing: 20
 
-            // SPO2 yazı
-                  Text {
-                      id: spo2Text
-                      text: reader.spo2 === -1 ? "SpO2: -" : "SpO2: " + reader.spo2 + " %"
-                      font.pixelSize: 20
-                  }
-
-            Rectangle {
-                width: 100; height: 150; color: "lightgray"
+            Column {
+                Text { text: reader.spo2 === -1 ? "SpO2: -" : "SpO2: " + reader.spo2 + " %" }
                 Rectangle {
-                    width: parent.width
-                    height: reader.spo2
-                    anchors.bottom: parent.bottom
-                    color: "red"
+                    width: 100; height: 150; color: "lightgray"
+                    Rectangle {
+                        width: parent.width
+                        height: reader.spo2
+                        anchors.bottom: parent.bottom
+                        color: "red"
+                    }
                 }
             }
 
-            Text {
-                      id: prText
-                      text: reader.pr === -1 ? "PR: -" : "PR: " + reader.pr + " bpm"
-                      font.pixelSize: 20
-                  }
-
-            Rectangle {
-                width: 100; height: 150; color: "lightgray"
+            Column {
+                Text { text: reader.pr === -1 ? "PR: -" : "PR: " + reader.pr + " bpm" }
                 Rectangle {
-                    width: parent.width
-                    height: reader.pr
-                    anchors.bottom: parent.bottom
-                    color: "blue"
+                    width: 100; height: 150; color: "lightgray"
+                    Rectangle {
+                        width: parent.width
+                        height: reader.pr
+                        anchors.bottom: parent.bottom
+                        color: "blue"
+                    }
                 }
             }
         }
 
-        Text {
-                  id: wfText
-                  text: "Waveform: "
-                  font.pixelSize: 20
-              }
-
-        // altta çizgi grafiği
+        // WAVEFORM
+        Text { text: "Waveform:"; font.pixelSize: 20 }
         Canvas {
             id: waveformCanvas
             width: 500; height: 150

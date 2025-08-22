@@ -3,21 +3,26 @@
 
 #include <QObject>
 #include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QDebug>
 
 class DatabaseManager : public QObject {
     Q_OBJECT
-
 public:
     explicit DatabaseManager(QObject *parent = nullptr);
 
-    // QML'den çağrılabilmesi için Q_INVOKABLE
-    Q_INVOKABLE void addPatient(const QString &firstName, const QString &lastName);
+    Q_INVOKABLE bool addPatient(const QString &firstName, const QString &lastName);
+    void saveMeasurement(int spo2, int pr);
+
+    bool hasActivePatient() const { return m_currentPatientId != -1; }
 
 signals:
-    void patientAdded(bool success);
+    void activePatientChanged(bool ready);
 
 private:
-    QSqlDatabase db;
+    QSqlDatabase m_db;
+    int m_currentPatientId = -1; // aktif hasta ID
 };
 
 #endif // DATABASEMANAGER_H
