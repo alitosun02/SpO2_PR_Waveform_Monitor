@@ -6,6 +6,8 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
+#include <QVariantList>
+#include <QVariantMap>
 
 class DatabaseManager : public QObject {
     Q_OBJECT
@@ -16,6 +18,9 @@ public:
     void saveMeasurement(int spo2, int pr);
 
     bool hasActivePatient() const { return m_currentPatientId != -1; }
+
+    // --- YENİ EKLENEN ---
+    Q_INVOKABLE QVariantList getRecentData() const;
 
 signals:
     void activePatientChanged(bool ready);
