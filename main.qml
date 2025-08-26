@@ -31,8 +31,10 @@ ApplicationWindow {
                     Button {
                         text: "Hasta Kaydet"
                         onClicked: {
-                            if (dbManager.addPatient(firstNameField.text || "", lastNameField.text || "")) {
+                            if (measurementModel.addPatient(firstNameField.text || "", lastNameField.text || "")) {
                                 console.log("Hasta kaydedildi")
+                                firstNameField.text = ""
+                                lastNameField.text = ""
                             } else {
                                 console.log("Hasta kaydı başarısız!")
                             }
@@ -43,25 +45,27 @@ ApplicationWindow {
                 // SPO2 & PR BARLARI
                 Row {
                     spacing: 20
+
                     Column {
                         Text { text: reader.spo2 === -1 ? "SpO2: -" : "SpO2: " + reader.spo2 + " %" }
                         Rectangle {
                             width: 100; height: 150; color: "lightgray"
                             Rectangle {
                                 width: parent.width
-                                height: reader.spo2
+                                height: reader.spo2 === -1 ? 0 : (reader.spo2 / 100.0 * parent.height)
                                 anchors.bottom: parent.bottom
                                 color: "red"
                             }
                         }
                     }
+
                     Column {
                         Text { text: reader.pr === -1 ? "PR: -" : "PR: " + reader.pr + " bpm" }
                         Rectangle {
                             width: 100; height: 150; color: "lightgray"
                             Rectangle {
                                 width: parent.width
-                                height: reader.pr
+                                height: reader.pr === -1 ? 0 : (reader.pr / 200.0 * parent.height)
                                 anchors.bottom: parent.bottom
                                 color: "blue"
                             }
@@ -74,12 +78,14 @@ ApplicationWindow {
                 Canvas {
                     id: waveformCanvas
                     width: 500; height: 150
+
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0,0,width,height)
                         ctx.strokeStyle = "green"
                         ctx.lineWidth = 2
                         ctx.beginPath()
+
                         if (reader.waveform.length > 0) {
                             var step = width / reader.waveform.length
                             ctx.moveTo(0, height - reader.waveform[0])
@@ -89,13 +95,14 @@ ApplicationWindow {
                         }
                         ctx.stroke()
                     }
+
                     Connections {
                         target: reader
                         function onWaveformChanged() { waveformCanvas.requestPaint() }
                     }
                 }
 
-                // --- YENİ BUTON ---
+                // VERİ SAYFASINA GEÇ
                 Button {
                     text: "Veri Tablosunu Aç"
                     onClicked: stackView.push(dataPage)
@@ -104,11 +111,14 @@ ApplicationWindow {
         }
     }
 
-    // --- 2 DAKİKALIK VERİ SAYFASI ---
+    // --- VERİ SAYFASI ---
     Component {
         id: dataPage
         Page {
-            title: "Son 2 Dakika Verileri"
+            title: "Tüm Kayıtlı Veriler"
+
+            // Sayfa görünür oldukça veriyi yenile
+            onVisibleChanged: if (visible) measurementModel.refreshData()
 
             Column {
                 anchors.fill: parent
@@ -117,50 +127,51 @@ ApplicationWindow {
 
                 // Başlık satırı
                 Row {
-                    spacing: 20
-                    Text { text: "Ad"; font.bold: true }
-                    Text { text: "Soyad"; font.bold: true }
-                    Text { text: "SpO₂"; font.bold: true }
-                    Text { text: "PR"; font.bold: true }
-                    Text { text: "Tarih/Saat"; font.bold: true }
+                    spacing: 80
+                    Text { text: "Ad"; font.bold: true; width: 80 }
+                    Text { text: "Soyad"; font.bold: true; width: 80 }
+                    Text { text: "SpO₂"; font.bold: true; width: 50 }
+                    Text { text: "PR"; font.bold: true; width: 50 }
+                    Text { text: "Tarih/Saat"; font.bold: true; width: 150 }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "gray"
+                }
+
+                // "Kayıt yok" mesajı
+                Text {
+                    id: emptyHint
+                    visible: measurementModel.rowCount() === 0
+                    text: "Henüz kayıt yok."
+                    color: "gray"
                 }
 
                 // Liste
                 ListView {
                     id: dataListView
-                    model: dataListModel
+                    visible: measurementModel.rowCount() > 0
+                    width: parent.width
+                    height: parent.height - 150
+                    model: measurementModel
                     clip: true
-                    height: parent.height - 100
+
                     delegate: Row {
-                        spacing: 20
-                        Text { text: first_name }
-                        Text { text: last_name }
-                        Text { text: spo2 }
-                        Text { text: pr }
-                        Text { text: timestamp }
+                        spacing: 80
+                        Text { text: first_name || ""; width: 80 }
+                        Text { text: last_name || ""; width: 80 }
+                        Text { text: spo2 || ""; width: 50 }
+                        Text { text: pr || ""; width: 50 }
+                        Text { text: timestamp || ""; width: 150 }
                     }
                 }
 
-                // Geri butonu
-                Button {
-                    text: "Geri"
-                    onClicked: stackView.pop()
-                }
-            }
-
-            ListModel { id: dataListModel }
-
-            Component.onCompleted: {
-                dataListModel.clear();
-                var data = dbManager.getRecentData();
-                for (var i = 0; i < data.length; ++i) {
-                    dataListModel.append({
-                        first_name: data[i].first_name,
-                        last_name:  data[i].last_name,
-                        spo2:       data[i].spo2,
-                        pr:         data[i].pr,
-                        timestamp:  data[i].timestamp
-                    })
+                Row {
+                    spacing: 10
+                    Button { text: "Yenile"; onClicked: measurementModel.refreshData() }
+                    Button { text: "Geri"; onClicked: stackView.pop() }
                 }
             }
         }

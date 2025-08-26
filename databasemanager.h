@@ -9,25 +9,25 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-class DatabaseManager : public QObject {
+class DatabaseManager : public QObject
+{
     Q_OBJECT
+
 public:
     explicit DatabaseManager(QObject *parent = nullptr);
+    ~DatabaseManager();
 
-    Q_INVOKABLE bool addPatient(const QString &firstName, const QString &lastName);
-    void saveMeasurement(int spo2, int pr);
+    bool addPatient(const QString &firstName, const QString &lastName, int &newPatientId);
+    void saveMeasurement(int patientId, int spo2, int pr);
+    QVariantList getAllData() const;
 
-    bool hasActivePatient() const { return m_currentPatientId != -1; }
-
-    // --- YENİ EKLENEN ---
-    Q_INVOKABLE QVariantList getRecentData() const;
-
-signals:
-    void activePatientChanged(bool ready);
+    // Veritabanı nesnesine erişim
+    QSqlDatabase& db() { return m_db; }
+    const QSqlDatabase& db() const { return m_db; }
 
 private:
     QSqlDatabase m_db;
-    int m_currentPatientId = -1; // aktif hasta ID
+    bool initializeDatabase();
 };
 
 #endif // DATABASEMANAGER_H

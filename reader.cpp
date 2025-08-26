@@ -19,8 +19,8 @@ Reader::Reader(const QString &portName, QObject *parent)
         return;
     }
 
-    qDebug() << serial.write(QByteArray::fromHex("BF 5F FF"));
-
+    // Başlangıç komutu
+    serial.write(QByteArray::fromHex("BF5FFF"));
     connect(&serial, &QSerialPort::readyRead, this, &Reader::readSerialData);
     qDebug() << portName << "açıldı, veri bekleniyor...";
 }
@@ -45,21 +45,23 @@ void Reader::readSerialData() {
 }
 
 void Reader::processPacket(const QByteArray &packet) {
+    if (packet.size() < 5) return;
     quint8 len  = static_cast<quint8>(packet[2]);
     quint8 code = static_cast<quint8>(packet[3]);
 
+    // checksum hesapla
     quint8 sum = len;
-    for (int i = 3; i < 3 + len; ++i)
+    for (int i = 3; i < 3 + len && i < packet.size(); ++i)
         sum += static_cast<quint8>(packet[i]);
     sum &= 0xFF;
     if (sum != static_cast<quint8>(packet[packet.size()-1])) return;
 
-    if (code == 21 && len == 10) {
+    if (code == 21 && len >= 10) {
         // waveform
-        quint8 waveform = static_cast<quint8>(packet[5]);
-        if (waveform != 127) {
+        quint8 waveformVal = static_cast<quint8>(packet[5]);
+        if (waveformVal != 127) {
             static int lastValue = 0;
-            int smooth = (lastValue + waveform) / 2; // basit ortalama
+            int smooth = (lastValue + waveformVal) / 2; // basit ortalama
             lastValue = smooth;
 
             m_waveform.append(smooth);
@@ -69,7 +71,7 @@ void Reader::processPacket(const QByteArray &packet) {
         }
 
         // SPO2
-        quint8 spo2   = static_cast<quint8>(packet[7]);
+        quint8 spo2  = static_cast<quint8>(packet[7]);
         if (spo2 == 127) {
             m_spo2 = -1;
         } else {
