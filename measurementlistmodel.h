@@ -10,6 +10,7 @@
 class MeasurementListModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(bool hasActivePatient READ hasActivePatient NOTIFY activePatientChanged)
 
 public:
     explicit MeasurementListModel(QObject *parent = nullptr);

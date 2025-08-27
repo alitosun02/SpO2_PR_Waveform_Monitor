@@ -102,6 +102,55 @@ ApplicationWindow {
                     }
                 }
 
+                // PDF EXPORT BUTONU
+                Button {
+                    text: "Waveform'u PDF Olarak Kaydet"
+                    enabled: measurementModel.hasActivePatient
+
+                    onClicked: {
+                        console.log("PDF buton tıklandı!")
+
+                        // Son eklenen hastanın adını al
+                        var patientName = "Hasta"
+
+                        // PDF olarak kaydet
+                        var success = pdfExporter.exportWaveformToPdf(
+                            waveformCanvas,
+                            patientName,
+                            reader.spo2,
+                            reader.pr
+                        )
+
+                        if (success) {
+                            console.log("PDF başarıyla kaydedildi!")
+                            statusText.text = "PDF başarıyla masaüstüne kaydedildi!"
+                            statusText.color = "green"
+                        } else {
+                            console.log("PDF kaydedilemedi!")
+                            statusText.text = "PDF kaydedilirken hata oluştu!"
+                            statusText.color = "red"
+                        }
+
+                        statusTimer.start()
+                    }
+                }
+
+                // DURUM MESAJI
+                Text {
+                    id: statusText
+                    text: ""
+                    font.pixelSize: 14
+                    color: "green"
+                }
+
+                // DURUM MESAJINI TEMİZLEME TIMER'I
+                Timer {
+                    id: statusTimer
+                    interval: 3000
+                    repeat: false
+                    onTriggered: statusText.text = ""
+                }
+
                 // VERİ SAYFASINA GEÇ
                 Button {
                     text: "Veri Tablosunu Aç"

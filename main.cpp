@@ -5,6 +5,7 @@
 #include "reader.h"
 #include "databasemanager.h"
 #include "measurementlistmodel.h"
+#include "pdfexporter.h"
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
@@ -18,6 +19,10 @@ int main(int argc, char *argv[]) {
     // Reader oluştur
     Reader r("COM8");
     engine.rootContext()->setContextProperty("reader", &r);
+
+    // PDF Exporter oluştur
+    PdfExporter pdfExporter;
+    engine.rootContext()->setContextProperty("pdfExporter", &pdfExporter);
 
     // Timer ile 10 saniyede bir kayıt
     auto saveTimer = new QTimer(&app);

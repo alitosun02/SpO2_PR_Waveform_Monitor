@@ -59,6 +59,7 @@ bool MeasurementListModel::addPatient(const QString &firstName, const QString &l
     if (m_dbManager.addPatient(firstName, lastName, newPatientId)) {
         m_currentPatientId = newPatientId;
         qDebug() << "Model: Aktif hasta ID set edildi:" << m_currentPatientId;
+        qDebug() << "Model: hasActivePatient() şimdi:" << hasActivePatient();
         emit activePatientChanged(true);
         refreshData();
         return true;
