@@ -29,6 +29,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     // QML'den çağrılabilir metodlar
+    Q_INVOKABLE QString getLastPatientName() const;
     Q_INVOKABLE bool addPatient(const QString &firstName, const QString &lastName);
     Q_INVOKABLE bool hasActivePatient() const;
     Q_INVOKABLE void refreshData();

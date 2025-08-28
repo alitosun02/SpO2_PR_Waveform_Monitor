@@ -104,3 +104,20 @@ void MeasurementListModel::loadDataFromDatabase()
     endResetModel();
     qDebug() << "Model: Yenilendi. Kayıt sayısı:" << m_data.count();
 }
+
+QString MeasurementListModel::getLastPatientName() const
+{
+    if (m_data.isEmpty()) {
+        return "Hasta Bulunamadı";
+    }
+
+    const QVariantMap &lastRecord = m_data.first();
+    QString firstName = lastRecord.value("first_name").toString();
+    QString lastName = lastRecord.value("last_name").toString();
+
+    if (firstName.isEmpty() && lastName.isEmpty()) {
+        return "Hasta Bulunamadı";
+    }
+
+    return (firstName + " " + lastName).trimmed();
+}

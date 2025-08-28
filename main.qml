@@ -110,8 +110,18 @@ ApplicationWindow {
                     onClicked: {
                         console.log("PDF buton tıklandı!")
 
-                        // Son eklenen hastanın adını al
-                        var patientName = "Hasta"
+                        // Önce text field'lardaki güncel değerleri kontrol et
+                        var patientName = ""
+
+                        if (firstNameField.text.trim() !== "" && lastNameField.text.trim() !== "") {
+                            // Text field'larda değer varsa bunu kullan
+                            patientName = firstNameField.text.trim() + " " + lastNameField.text.trim()
+                            console.log("Text field'lardan alınan hasta adı:", patientName)
+                        } else {
+                            // Text field'lar boşsa model'den al
+                            patientName = measurementModel.getLastPatientName()
+                            console.log("Model'den alınan hasta adı:", patientName)
+                        }
 
                         // PDF olarak kaydet
                         var success = pdfExporter.exportWaveformToPdf(

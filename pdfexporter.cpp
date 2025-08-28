@@ -19,150 +19,188 @@ bool PdfExporter::exportWaveformToPdf(QQuickItem *canvas, const QString &patient
     }
 
     try {
-        // PDF dosyasının kaydedileceği yol
-        QString fileName = generateFileName(patientName);
+        QString actualPatientName = patientName.trimmed();
+        qDebug() << "PDF için gelen hasta adı:" << actualPatientName;
+
+        QString fileName = generateFileName(actualPatientName);
         QString fullPath = getDesktopPath() + "/" + fileName;
 
-        qDebug() << "PDF kaydedilecek yer:" << fullPath;
-
-        // PDF Writer oluştur
         QPdfWriter pdfWriter(fullPath);
         pdfWriter.setPageSize(QPageSize::A4);
-        pdfWriter.setPageMargins(QMarginsF(20, 20, 20, 20), QPageLayout::Millimeter);
-        pdfWriter.setResolution(300); // Yüksek çözünürlük
+        pdfWriter.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+        pdfWriter.setResolution(300);
 
         QPainter painter(&pdfWriter);
 
-        // Sayfa boyutlarını al (pixel cinsinden)
-        QRect pageRect = pdfWriter.pageLayout().paintRectPixels(pdfWriter.resolution());
+        // Basit koordinat sistemi - sadece painter.viewport() kullan
+        QRect viewport = painter.viewport();
+        int centerX = viewport.center().x();  // Tam orta nokta
+        int pageWidth = viewport.width();
+        int pageLeft = viewport.left();
 
-        // Türkçe karakter desteği için font ayarla
+        qDebug() << "Viewport:" << viewport;
+        qDebug() << "Center X:" << centerX;
+
+        // Font ayarları
         QFont titleFont("Arial", 18, QFont::Bold);
-        QFont normalFont("Arial", 12);
-        QFont boldFont("Arial", 12, QFont::Bold);
+        QFont dateFont("Arial", 10);
+        QFont sectionFont("Arial", 12, QFont::Bold);
+        QFont normalFont("Arial", 10);
 
-        // Y pozisyonu takibi için
-        int currentY = 100;
-        const int lineSpacing = 80;
-        const int sectionSpacing = 120;
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
 
-        // BAŞLIK
+        int currentY = viewport.top() + 80;
+        const int spacing = 60;
+
+        // BAŞLIK - Center noktasından başlayarak
         painter.setFont(titleFont);
         painter.setPen(Qt::black);
-        QRect titleRect(pageRect.left(), currentY, pageRect.width(), lineSpacing);
-        painter.drawText(titleRect, Qt::AlignCenter, "SpO₂ PR Waveform Raporu");
-        currentY += sectionSpacing;
 
-        // TARİH VE SAAT - Sağ üstte
-        painter.setFont(normalFont);
+        QString title = "SpO₂ PR Waveform Raporu";
+        QRect titleBounds = painter.fontMetrics().boundingRect(title);
+        int titleStartX = centerX - titleBounds.width() / 2;
+
+        painter.drawText(titleStartX, currentY, title);
+        currentY += spacing;
+
+        // TARİH
+        painter.setFont(dateFont);
         QString dateTime = QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
-        QRect dateRect(pageRect.right() - 400, currentY, 400, lineSpacing);
-        painter.drawText(dateRect, Qt::AlignRight, "Tarih: " + dateTime);
-        currentY += sectionSpacing;
+        QString dateText = "Tarih: " + dateTime;
 
-        // HASTA BİLGİSİ
-        if (!patientName.isEmpty()) {
-            painter.setFont(boldFont);
-            QRect patientRect(pageRect.left(), currentY, pageRect.width(), lineSpacing);
-            painter.drawText(patientRect, Qt::AlignLeft, "Hasta: " + patientName);
-            currentY += lineSpacing;
-        }
+        QRect dateBounds = painter.fontMetrics().boundingRect(dateText);
+        int dateStartX = centerX - dateBounds.width() / 2;
+
+        painter.drawText(dateStartX, currentY, dateText);
+        currentY += spacing;
+
+        // HASTA ADI
+        painter.setFont(sectionFont);
+        QString patientText = "Hasta: " + actualPatientName;
+
+        QRect patientBounds = painter.fontMetrics().boundingRect(patientText);
+        int patientStartX = centerX - patientBounds.width() / 2;
+
+        painter.drawText(patientStartX, currentY, patientText);
+        currentY += spacing;
+
+        // AYIRAÇ ÇİZGİSİ - Ortadan eşit mesafede
+        painter.setPen(QPen(Qt::black, 2));
+        int lineLength = pageWidth / 3;
+        int lineStartX = centerX - lineLength / 2;
+        int lineEndX = centerX + lineLength / 2;
+        painter.drawLine(lineStartX, currentY, lineEndX, currentY);
+        currentY += spacing;
+
+        // ÖLÇÜM SONUÇLARI BAŞLIĞI
+        painter.setFont(sectionFont);
+        painter.setPen(Qt::black);
+        QString measureTitle = "Ölçüm Sonuçları";
+
+        QRect measureTitleBounds = painter.fontMetrics().boundingRect(measureTitle);
+        int measureTitleStartX = centerX - measureTitleBounds.width() / 2;
+
+        painter.drawText(measureTitleStartX, currentY, measureTitle);
+        currentY += spacing;
 
         // ÖLÇÜM DEĞERLERİ
-        painter.setFont(boldFont);
-        painter.drawText(pageRect.left(), currentY, "Ölçüm Sonuçları:");
-        currentY += lineSpacing;
-
         painter.setFont(normalFont);
 
-        if (spo2Value != -1) {
-            QString spo2Text = QString("SpO₂: %1 %").arg(spo2Value);
-            painter.drawText(pageRect.left() + 50, currentY, spo2Text);
-            currentY += lineSpacing;
-        }
+        if (spo2Value != -1 && prValue != -1) {
+            QString measurementText = QString("SpO₂: %1 %    •    Nabız: %2 bpm").arg(spo2Value).arg(prValue);
 
-        if (prValue != -1) {
-            QString prText = QString("Nabız: %1 bpm").arg(prValue);
-            painter.drawText(pageRect.left() + 50, currentY, prText);
-            currentY += lineSpacing;
-        }
+            QRect measureBounds = painter.fontMetrics().boundingRect(measurementText);
+            int measureStartX = centerX - measureBounds.width() / 2;
 
-        currentY += sectionSpacing;
+            painter.drawText(measureStartX, currentY, measurementText);
+        }
+        currentY += spacing;
 
         // WAVEFORM BAŞLIĞI
-        painter.setFont(boldFont);
-        painter.drawText(pageRect.left(), currentY, "Waveform Grafiği:");
-        currentY += lineSpacing + 50;
+        painter.setFont(sectionFont);
+        QString waveTitle = "Son 20 Saniye Waveform Grafiği";
 
-        // CANVAS RESMİNİ YAKALA VE EKLE
+        QRect waveTitleBounds = painter.fontMetrics().boundingRect(waveTitle);
+        int waveTitleStartX = centerX - waveTitleBounds.width() / 2;
+
+        painter.drawText(waveTitleStartX, currentY, waveTitle);
+        currentY += spacing;
+
+        // WAVEFORM GRAFİĞİ - Tam ortala
         QQuickWindow *window = canvas->window();
         if (window) {
-            // Canvas'ın konumunu ve boyutunu al
             QPointF canvasPos = canvas->mapToScene(QPointF(0, 0));
             QSizeF canvasSize = QSizeF(canvas->width(), canvas->height());
 
-            // Tüm pencereyi yakala
             QImage windowImage = window->grabWindow();
 
             if (!windowImage.isNull()) {
-                // Canvas kısmını kırp
                 QRect canvasRect(
-                    static_cast<int>(canvasPos.x()),
-                    static_cast<int>(canvasPos.y()),
-                    static_cast<int>(canvasSize.width()),
-                    static_cast<int>(canvasSize.height())
+                    qBound(0, static_cast<int>(canvasPos.x()), windowImage.width()),
+                    qBound(0, static_cast<int>(canvasPos.y()), windowImage.height()),
+                    qMin(static_cast<int>(canvasSize.width()), windowImage.width() - static_cast<int>(canvasPos.x())),
+                    qMin(static_cast<int>(canvasSize.height()), windowImage.height() - static_cast<int>(canvasPos.y()))
                     );
 
-                // Güvenli kırpma - sınırları kontrol et
-                canvasRect = canvasRect.intersected(windowImage.rect());
                 QImage canvasImage = windowImage.copy(canvasRect);
 
-                if (!canvasImage.isNull()) {
-                    // Canvas resmini daha büyük boyutlarda PDF'e yerleştir
-                    int imageWidth = pageRect.width() - 100; // Kenar boşlukları
-                    int imageHeight = static_cast<int>(imageWidth * 0.3); // En boy oranı
+                if (!canvasImage.isNull() && canvasImage.width() > 0 && canvasImage.height() > 0) {
+                    // Grafik boyutları - sayfa genişliğinin %75'i
+                    int imageWidth = static_cast<int>(pageWidth * 0.75);
+                    int imageHeight = 280;
 
-                    // Sayfaya sığacak boyutta olup olmadığını kontrol et
-                    int remainingHeight = pageRect.bottom() - currentY - 100;
+                    // Sayfaya sığar mı kontrol
+                    int remainingHeight = viewport.bottom() - currentY - 80;
                     if (imageHeight > remainingHeight) {
                         imageHeight = remainingHeight;
-                        imageWidth = static_cast<int>(imageHeight / 0.3);
                     }
 
-                    QRect targetRect(
-                        pageRect.left() + 50,
-                        currentY,
-                        imageWidth,
-                        imageHeight
-                        );
+                    // TAM ORTALA - centerX'ten başlayarak
+                    int imageStartX = centerX - imageWidth / 2;
 
-                    // Yüksek kaliteli render için smooth transformation
-                    painter.setRenderHint(QPainter::Antialiasing, true);
+                    QRect targetRect(imageStartX, currentY, imageWidth, imageHeight);
+
+                    // Beyaz arka plan
+                    painter.fillRect(targetRect, Qt::white);
+
+                    // Grafik çiz
                     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-
                     painter.drawImage(targetRect, canvasImage);
 
-                    // Waveform etrafına çerçeve çiz
+                    // Çerçeve
                     painter.setPen(QPen(Qt::black, 2));
                     painter.drawRect(targetRect);
 
-                    qDebug() << "PDF başarıyla oluşturuldu:" << fullPath;
-                    qDebug() << "Canvas boyutu:" << canvasSize;
-                    qDebug() << "PDF'deki görüntü boyutu:" << targetRect.size();
+                    // Alt not
+                    currentY = targetRect.bottom() + 25;
+                    painter.setFont(QFont("Arial", 8));
+                    painter.setPen(Qt::darkGray);
 
+                    QString note = "* Grafikte son 20 saniyeye ait waveform verileri gösterilmektedir";
+                    QRect noteBounds = painter.fontMetrics().boundingRect(note);
+                    int noteStartX = centerX - noteBounds.width() / 2;
+
+                    painter.drawText(noteStartX, currentY, note);
+
+                    qDebug() << "PDF başarıyla oluşturuldu:" << fullPath;
+                    qDebug() << "Grafik tam ortada - X:" << imageStartX << "Center:" << centerX;
                     return true;
                 } else {
-                    qWarning() << "Canvas resmi kırpılamadı!";
-                    return false;
+                    // Hata mesajı da ortalı
+                    painter.setFont(normalFont);
+                    painter.setPen(Qt::red);
+                    QString errorMsg = "Waveform verisi bulunamadı";
+
+                    QRect errorBounds = painter.fontMetrics().boundingRect(errorMsg);
+                    int errorStartX = centerX - errorBounds.width() / 2;
+
+                    painter.drawText(errorStartX, currentY, errorMsg);
+                    return true;
                 }
-            } else {
-                qWarning() << "Pencere görüntüsü alınamadı!";
-                return false;
             }
-        } else {
-            qWarning() << "Canvas window bulunamadı!";
-            return false;
         }
+        return false;
 
     } catch (const std::exception &e) {
         qCritical() << "PDF oluşturulurken hata:" << e.what();
@@ -174,11 +212,9 @@ QString PdfExporter::getDesktopPath() const
 {
     QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
     if (desktopPath.isEmpty()) {
-        // Desktop path bulunamazsa Documents kullan
         desktopPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
 
-    // Klasör yoksa oluştur
     QDir dir(desktopPath);
     if (!dir.exists()) {
         dir.mkpath(desktopPath);
@@ -192,8 +228,7 @@ QString PdfExporter::generateFileName(const QString &patientName) const
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
     QString fileName;
 
-    if (!patientName.isEmpty()) {
-        // Hasta adını dosya adına uygun hale getir (Türkçe karakterleri değiştir)
+    if (!patientName.isEmpty() && patientName != "Kayıt Yok" && patientName != "Hasta Bulunamadı") {
         QString cleanName = patientName;
         cleanName = cleanName.replace("ç", "c").replace("Ç", "C")
                         .replace("ğ", "g").replace("Ğ", "G")
