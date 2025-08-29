@@ -82,7 +82,7 @@ ApplicationWindow {
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0,0,width,height)
-                        ctx.strokeStyle = "green"
+                        ctx.strokeStyle = "dark green"
                         ctx.lineWidth = 2
                         ctx.beginPath()
 

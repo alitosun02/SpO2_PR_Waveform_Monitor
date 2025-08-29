@@ -12,6 +12,7 @@ class Reader : public QObject
     Q_PROPERTY(int spo2 READ spo2 NOTIFY spo2Changed)
     Q_PROPERTY(int pr READ pr NOTIFY prChanged)
     Q_PROPERTY(QVariantList waveform READ waveform NOTIFY waveformChanged)
+    Q_INVOKABLE QVariantList getLast20SecondsWaveform() const;
 
 public:
     explicit Reader(const QString &portName, QObject *parent = nullptr);

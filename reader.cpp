@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QTimer>
 #include <QCoreApplication>
+#include <QDateTime>
 
 Reader::Reader(const QString &portName, QObject *parent)
     : QObject(parent)
@@ -32,8 +33,8 @@ void Reader::readSerialData() {
         int start = buffer.indexOf(QByteArray::fromHex("AA55"));
         if (start < 0) { buffer.clear(); break; }
         if (start > 0) buffer.remove(0, start);
-
         if (buffer.size() < 3) break;
+
         quint8 len = static_cast<quint8>(buffer[2]);
         int totalSize = 2 + 1 + len + 1;
         if (buffer.size() < totalSize) break;
@@ -46,6 +47,7 @@ void Reader::readSerialData() {
 
 void Reader::processPacket(const QByteArray &packet) {
     if (packet.size() < 5) return;
+
     quint8 len  = static_cast<quint8>(packet[2]);
     quint8 code = static_cast<quint8>(packet[3]);
 
@@ -54,6 +56,7 @@ void Reader::processPacket(const QByteArray &packet) {
     for (int i = 3; i < 3 + len && i < packet.size(); ++i)
         sum += static_cast<quint8>(packet[i]);
     sum &= 0xFF;
+
     if (sum != static_cast<quint8>(packet[packet.size()-1])) return;
 
     if (code == 21 && len >= 10) {
@@ -65,8 +68,12 @@ void Reader::processPacket(const QByteArray &packet) {
             lastValue = smooth;
 
             m_waveform.append(smooth);
-            if (m_waveform.size() > 200)
+
+            // 20 saniye için maksimum 1000 nokta tutuyoruz (yaklaşık 50Hz sampling)
+            // Bu daha gerçekçi ve performanslı
+            if (m_waveform.size() > 1000)
                 m_waveform.removeFirst();
+
             emit waveformChanged();
         }
 
@@ -90,4 +97,15 @@ void Reader::processPacket(const QByteArray &packet) {
         }
         emit prChanged();
     }
+}
+
+QVariantList Reader::getLast20SecondsWaveform() const {
+    // Tüm mevcut veriyi döndür (zaten maksimum 20 saniye tutuluyor)
+    QVariantList result;
+    for (const QVariant &point : m_waveform) {
+        result.append(point);
+    }
+
+    qDebug() << "getLast20SecondsWaveform() - dönen nokta sayısı:" << result.size();
+    return result;
 }

@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QPageLayout>
 #include <QPageSize>
+#include <QQmlContext>
 
 PdfExporter::PdfExporter(QObject *parent)
     : QObject(parent)
@@ -127,84 +128,161 @@ bool PdfExporter::exportWaveformToPdf(QQuickItem *canvas, const QString &patient
         painter.drawText(waveTitleStartX, currentY, waveTitle);
         currentY += spacing;
 
-        // WAVEFORM GRAFİĞİ - Tam ortala
-        QQuickWindow *window = canvas->window();
-        if (window) {
-            QPointF canvasPos = canvas->mapToScene(QPointF(0, 0));
-            QSizeF canvasSize = QSizeF(canvas->width(), canvas->height());
+        // *** ANA DEĞIŞIKLIK: Reader'dan 20 saniyelik veriyi al ve çiz ***
+        // Canvas'tan görüntü almak yerine, doğrudan Reader'dan veri alıp çiziyoruz
 
-            QImage windowImage = window->grabWindow();
-
-            if (!windowImage.isNull()) {
-                QRect canvasRect(
-                    qBound(0, static_cast<int>(canvasPos.x()), windowImage.width()),
-                    qBound(0, static_cast<int>(canvasPos.y()), windowImage.height()),
-                    qMin(static_cast<int>(canvasSize.width()), windowImage.width() - static_cast<int>(canvasPos.x())),
-                    qMin(static_cast<int>(canvasSize.height()), windowImage.height() - static_cast<int>(canvasPos.y()))
-                    );
-
-                QImage canvasImage = windowImage.copy(canvasRect);
-
-                if (!canvasImage.isNull() && canvasImage.width() > 0 && canvasImage.height() > 0) {
-                    // Grafik boyutları - sayfa genişliğinin %75'i
-                    int imageWidth = static_cast<int>(pageWidth * 0.75);
-                    int imageHeight = 280;
-
-                    // Sayfaya sığar mı kontrol
-                    int remainingHeight = viewport.bottom() - currentY - 80;
-                    if (imageHeight > remainingHeight) {
-                        imageHeight = remainingHeight;
-                    }
-
-                    // TAM ORTALA - centerX'ten başlayarak
-                    int imageStartX = centerX - imageWidth / 2;
-
-                    QRect targetRect(imageStartX, currentY, imageWidth, imageHeight);
-
-                    // Beyaz arka plan
-                    painter.fillRect(targetRect, Qt::white);
-
-                    // Grafik çiz
-                    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-                    painter.drawImage(targetRect, canvasImage);
-
-                    // Çerçeve
-                    painter.setPen(QPen(Qt::black, 2));
-                    painter.drawRect(targetRect);
-
-                    // Alt not
-                    currentY = targetRect.bottom() + 25;
-                    painter.setFont(QFont("Arial", 8));
-                    painter.setPen(Qt::darkGray);
-
-                    QString note = "* Grafikte son 20 saniyeye ait waveform verileri gösterilmektedir";
-                    QRect noteBounds = painter.fontMetrics().boundingRect(note);
-                    int noteStartX = centerX - noteBounds.width() / 2;
-
-                    painter.drawText(noteStartX, currentY, note);
-
-                    qDebug() << "PDF başarıyla oluşturuldu:" << fullPath;
-                    qDebug() << "Grafik tam ortada - X:" << imageStartX << "Center:" << centerX;
-                    return true;
-                } else {
-                    // Hata mesajı da ortalı
-                    painter.setFont(normalFont);
-                    painter.setPen(Qt::red);
-                    QString errorMsg = "Waveform verisi bulunamadı";
-
-                    QRect errorBounds = painter.fontMetrics().boundingRect(errorMsg);
-                    int errorStartX = centerX - errorBounds.width() / 2;
-
-                    painter.drawText(errorStartX, currentY, errorMsg);
-                    return true;
+        // QML context'inden reader nesnesine erişim
+        QObject *readerObj = nullptr;
+        if (canvas->window()) {
+            QQmlEngine *engine = qmlEngine(canvas);
+            if (engine) {
+                QQmlContext *context = engine->rootContext();
+                if (context) {
+                    readerObj = context->contextProperty("reader").value<QObject*>();
                 }
             }
         }
-        return false;
+
+        if (readerObj) {
+            // Reader'dan son 20 saniyelik waveform verisini al
+            QVariantList waveformData;
+            QMetaObject::invokeMethod(readerObj, "getLast20SecondsWaveform",
+                                      Q_RETURN_ARG(QVariantList, waveformData));
+
+            qDebug() << "PDF için alınan waveform nokta sayısı:" << waveformData.size();
+
+            if (!waveformData.isEmpty()) {
+                // Grafik boyutları - sayfa genişliğinin %75'i
+                int imageWidth = static_cast<int>(pageWidth * 0.75);
+                int imageHeight = 280;
+
+                // Sayfaya sığar mı kontrol
+                int remainingHeight = viewport.bottom() - currentY - 80;
+                if (imageHeight > remainingHeight) {
+                    imageHeight = remainingHeight;
+                }
+
+                // TAM ORTALA - centerX'ten başlayarak
+                int imageStartX = centerX - imageWidth / 2;
+                QRect targetRect(imageStartX, currentY, imageWidth, imageHeight);
+
+                // Bej arka plan
+                painter.fillRect(targetRect, QColor("#F5F5DC"));
+
+                // Waveform verilerini çiz
+                drawWaveformData(painter, targetRect, waveformData);
+
+                // Çerçeve
+                painter.setPen(QPen(Qt::black, 2));
+                painter.drawRect(targetRect);
+
+                // Alt not - daha fazla boşluk bırak
+                currentY = targetRect.bottom() + 100;
+                painter.setFont(QFont("Arial", 8));
+                painter.setPen(Qt::darkGray);
+
+                QString note = "* Grafikte son 20 saniyeye ait waveform verileri gösterilmektedir";
+                QRect noteBounds = painter.fontMetrics().boundingRect(note);
+                int noteStartX = centerX - noteBounds.width() / 2;
+
+                painter.drawText(noteStartX, currentY, note);
+
+                qDebug() << "PDF başarıyla oluşturuldu:" << fullPath;
+                qDebug() << "Waveform verileri çizildi. Nokta sayısı:" << waveformData.size();
+                return true;
+            } else {
+                // Veri yok mesajı
+                painter.setFont(normalFont);
+                painter.setPen(Qt::red);
+                QString errorMsg = "20 saniyelik waveform verisi henüz biriktirilmedi";
+
+                QRect errorBounds = painter.fontMetrics().boundingRect(errorMsg);
+                int errorStartX = centerX - errorBounds.width() / 2;
+
+                painter.drawText(errorStartX, currentY, errorMsg);
+                return true;
+            }
+        } else {
+            // Reader nesnesine erişilemedi
+            painter.setFont(normalFont);
+            painter.setPen(Qt::red);
+            QString errorMsg = "Waveform verisine erişilemiyor";
+
+            QRect errorBounds = painter.fontMetrics().boundingRect(errorMsg);
+            int errorStartX = centerX - errorBounds.width() / 2;
+
+            painter.drawText(errorStartX, currentY, errorMsg);
+            return true;
+        }
 
     } catch (const std::exception &e) {
         qCritical() << "PDF oluşturulurken hata:" << e.what();
         return false;
+    }
+
+    return false;
+}
+
+void PdfExporter::drawWaveformData(QPainter &painter, const QRect &rect, const QVariantList &waveformData)
+{
+    if (waveformData.isEmpty()) return;
+
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor("#006400"), 2)); // Koyu yeşil (Dark Green)
+
+    int dataCount = waveformData.size();
+    if (dataCount < 2) return;
+
+    // X ekseni adımları
+    double stepX = static_cast<double>(rect.width()) / (dataCount - 1);
+
+    // Y ekseni normalizasyonu (0-255 değerlerini rect yüksekliğine sığdır)
+    int rectTop = rect.top();
+    int rectBottom = rect.bottom();
+    int rectHeight = rect.height();
+
+    QPainterPath path;
+    bool firstPoint = true;
+
+    for (int i = 0; i < dataCount; ++i) {
+        bool ok;
+        double value = waveformData.at(i).toDouble(&ok);
+        if (!ok) continue;
+
+        // X koordinatı
+        double x = rect.left() + (i * stepX);
+
+        // Y koordinatı (değeri rect içine sığdır, ters çevir çünkü PDF'de Y yukarı doğru artar)
+        double normalizedValue = qBound(0.0, value / 255.0, 1.0); // 0-1 arasına normalize et
+        double y = rectBottom - (normalizedValue * rectHeight);
+
+        if (firstPoint) {
+            path.moveTo(x, y);
+            firstPoint = false;
+        } else {
+            path.lineTo(x, y);
+        }
+    }
+
+    painter.drawPath(path);
+
+    // Zaman ekseninde işaretlemeler ekle
+    painter.setPen(QPen(Qt::gray, 1));
+    QFont timeFont("Arial", 8);
+    painter.setFont(timeFont);
+
+    // 5 saniye aralıklarla işaretleme
+    for (int seconds = 0; seconds <= 20; seconds += 5) {
+        double progress = static_cast<double>(seconds) / 20.0;
+        double x = rect.left() + (progress * rect.width());
+
+        // Dikey çizgi
+        painter.drawLine(x, rect.bottom(), x, rect.bottom() + 5);
+
+        // Zaman etiketi
+        QString timeLabel = QString("-%1s").arg(20 - seconds);
+        QRect textRect = painter.fontMetrics().boundingRect(timeLabel);
+        painter.drawText(x - textRect.width()/2, rect.bottom() + 35, timeLabel);
     }
 }
 
