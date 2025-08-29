@@ -128,8 +128,8 @@ bool PdfExporter::exportWaveformToPdf(QQuickItem *canvas, const QString &patient
         painter.drawText(waveTitleStartX, currentY, waveTitle);
         currentY += spacing;
 
-        // *** ANA DEĞIŞIKLIK: Reader'dan 20 saniyelik veriyi al ve çiz ***
-        // Canvas'tan görüntü almak yerine, doğrudan Reader'dan veri alıp çiziyoruz
+        // *** ANA DEĞIŞIKLIK: Reader'dan 20 saniyelik buffer verisini al ***
+        // Artık Canvas görüntüsü yerine, doğrudan buffer'daki timestamp'li veriyi kullanıyoruz
 
         // QML context'inden reader nesnesine erişim
         QObject *readerObj = nullptr;
@@ -177,7 +177,7 @@ bool PdfExporter::exportWaveformToPdf(QQuickItem *canvas, const QString &patient
                 painter.drawRect(targetRect);
 
                 // Alt not - daha fazla boşluk bırak
-                currentY = targetRect.bottom() + 100;
+                currentY = targetRect.bottom() + 80;
                 painter.setFont(QFont("Arial", 8));
                 painter.setPen(Qt::darkGray);
 

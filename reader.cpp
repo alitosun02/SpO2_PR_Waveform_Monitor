@@ -2,7 +2,6 @@
 #include <QDebug>
 #include <QTimer>
 #include <QCoreApplication>
-#include <QDateTime>
 
 Reader::Reader(const QString &portName, QObject *parent)
     : QObject(parent)
@@ -67,12 +66,15 @@ void Reader::processPacket(const QByteArray &packet) {
             int smooth = (lastValue + waveformVal) / 2; // basit ortalama
             lastValue = smooth;
 
-            m_waveform.append(smooth);
+            // Timestamp'li buffer'a ekle
+            qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+            m_waveformBuffer.enqueue(WaveformPoint(smooth, currentTime));
 
-            // 20 saniye için maksimum 1000 nokta tutuyoruz (yaklaşık 50Hz sampling)
-            // Bu daha gerçekçi ve performanslı
-            if (m_waveform.size() > 1000)
-                m_waveform.removeFirst();
+            // Eski verileri temizle (20 saniyeden eski)
+            cleanOldData();
+
+            // Ekran için waveform güncelle
+            updateDisplayWaveform();
 
             emit waveformChanged();
         }
@@ -99,13 +101,46 @@ void Reader::processPacket(const QByteArray &packet) {
     }
 }
 
+void Reader::cleanOldData() {
+    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+    qint64 twentySecondsAgo = currentTime - (20 * 1000); // 20 saniye
+
+    // 20 saniyeden eski verileri kaldır
+    while (!m_waveformBuffer.isEmpty() &&
+           m_waveformBuffer.first().timestamp < twentySecondsAgo) {
+        m_waveformBuffer.dequeue();
+    }
+}
+
+void Reader::updateDisplayWaveform() {
+    // Ekran için son MAX_DISPLAY_POINTS kadar veriyi al
+    m_waveform.clear();
+
+    int totalPoints = m_waveformBuffer.size();
+    int startIndex = qMax(0, totalPoints - MAX_DISPLAY_POINTS);
+
+    for (int i = startIndex; i < totalPoints; ++i) {
+        m_waveform.append(m_waveformBuffer.at(i).value);
+    }
+}
+
 QVariantList Reader::getLast20SecondsWaveform() const {
-    // Tüm mevcut veriyi döndür (zaten maksimum 20 saniye tutuluyor)
     QVariantList result;
-    for (const QVariant &point : m_waveform) {
-        result.append(point);
+
+    for (const WaveformPoint &point : m_waveformBuffer) {
+        result.append(point.value);
     }
 
     qDebug() << "getLast20SecondsWaveform() - dönen nokta sayısı:" << result.size();
+    return result;
+}
+
+QVariantList Reader::getLast20SecondsTimestamps() const {
+    QVariantList result;
+
+    for (const WaveformPoint &point : m_waveformBuffer) {
+        result.append(point.timestamp);
+    }
+
     return result;
 }
