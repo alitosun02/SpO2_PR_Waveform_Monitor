@@ -144,3 +144,69 @@ QVariantList Reader::getLast20SecondsTimestamps() const {
 
     return result;
 }
+
+// YENİ FONKSİYONLAR - Ayar menüsü için
+
+bool Reader::setResponseTime(int seconds) {
+    qDebug() << "setResponseTime çağrıldı:" << seconds << "saniye";
+
+    quint8 settingByte = 0x00; // Başlangıç değeri
+
+    // Frequency ayarı (50Hz varsayılan): Bits 1,0 = 10
+    settingByte |= 0x02; // 10 binary = 0x02
+
+    // Mode ayarı (Adult varsayılan): Bits 4,3,2 = 100
+    settingByte |= 0x10; // 100 binary shifted = 0x10
+
+    // Response time ayarı: Bits 7,6,5
+    switch (seconds) {
+    case 4:
+        settingByte |= 0x92; // 100 binary shifted = 0x92
+        break;
+    case 8:
+        settingByte |= 0xB2; // 101 binary shifted = 0xB2
+        break;
+    case 16:
+        settingByte |= 0xD2; // 110 binary shifted = 0xD2
+        break;
+    default:
+        qWarning() << "Geçersiz response time:" << seconds << "- 4, 8 veya 16 olmalı";
+        return false;
+    }
+
+    // Ayar paketini gönder
+    sendSettingToBiolight(settingByte);
+    qDebug() << "Response time ayarlandı:" << seconds << "saniye (Byte: 0x" << Qt::hex << settingByte << ")";
+    return true;
+}
+
+void Reader::sendSettingToBiolight(quint8 data) {
+    // Protokol: AA55 LEN CODE DATA CHECKSUM
+    QByteArray packet;
+
+    // Header
+    packet.append(static_cast<char>(0xAA));
+    packet.append(static_cast<char>(0x55));
+
+    // Length (CODE + DATA = 2 bytes)
+    quint8 len = 0x02;
+    packet.append(static_cast<char>(len));
+
+    // Code (6 = Biolight ayar)
+    quint8 code = 0x06;
+    packet.append(static_cast<char>(code));
+
+    // Data
+    packet.append(static_cast<char>(data));
+
+    // Checksum (LEN + CODE + DATA)
+    quint8 checksum = (len + code + data) & 0xFF;
+    packet.append(static_cast<char>(checksum));
+
+    // Paketi gönder
+    qint64 bytesWritten = serial.write(packet);
+    serial.flush(); // Hemen gönderilmesini sağla
+
+    qDebug() << "Biolight ayar paketi gönderildi:" << packet.toHex(' ')
+             << "(" << bytesWritten << "bytes)";
+}

@@ -19,6 +19,17 @@ ApplicationWindow {
         id: mainPage
         Page {
             title: "Ana Sayfa"
+
+            // AYAR BUTONU - Sağ üst köşe
+            Button {
+                id: settingsButton
+                text: "⚙️ Ayarlar"
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 20
+                onClicked: settingsPopup.open()
+            }
+
             Column {
                 anchors.centerIn: parent
                 spacing: 20
@@ -74,131 +85,131 @@ ApplicationWindow {
                 }
 
                 // WAVEFORM - Gelişmiş versiyon
-                                Text { text: "Waveform:"; font.pixelSize: 20 }
+                Text { text: "Waveform:"; font.pixelSize: 20 }
 
-                                Rectangle {
-                                    width: 520; height: 170
-                                    color: "#F5F5DC" // Bej arka plan
-                                    border.color: "black"
-                                    border.width: 2
+                Rectangle {
+                    width: 520; height: 170
+                    color: "#F5F5DC" // Bej arka plan
+                    border.color: "black"
+                    border.width: 2
 
-                                    Canvas {
-                                        id: waveformCanvas
-                                        anchors.fill: parent
-                                        anchors.margins: 10
+                    Canvas {
+                        id: waveformCanvas
+                        anchors.fill: parent
+                        anchors.margins: 10
 
-                                        onPaint: {
-                                            var ctx = getContext("2d")
-                                            ctx.clearRect(0, 0, width, height)
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
 
-                                            // Grid çizgilerini çiz
-                                            drawGrid(ctx)
+                            // Grid çizgilerini çiz
+                            drawGrid(ctx)
 
-                                            // Waveform çiz
-                                            drawWaveform(ctx)
-                                        }
+                            // Waveform çiz
+                            drawWaveform(ctx)
+                        }
 
-                                        function drawGrid(ctx) {
-                                            ctx.strokeStyle = "#D3D3D3" // Açık gri
-                                            ctx.lineWidth = 0.5
+                        function drawGrid(ctx) {
+                            ctx.strokeStyle = "#D3D3D3" // Açık gri
+                            ctx.lineWidth = 0.5
 
-                                            // Yatay grid çizgileri
-                                            var gridSpacingY = height / 8
-                                            for (var i = 1; i < 8; i++) {
-                                                ctx.beginPath()
-                                                ctx.moveTo(0, i * gridSpacingY)
-                                                ctx.lineTo(width, i * gridSpacingY)
-                                                ctx.stroke()
-                                            }
+                            // Yatay grid çizgileri
+                            var gridSpacingY = height / 8
+                            for (var i = 1; i < 8; i++) {
+                                ctx.beginPath()
+                                ctx.moveTo(0, i * gridSpacingY)
+                                ctx.lineTo(width, i * gridSpacingY)
+                                ctx.stroke()
+                            }
 
-                                            // Dikey grid çizgileri
-                                            var gridSpacingX = width / 10
-                                            for (var i = 1; i < 10; i++) {
-                                                ctx.beginPath()
-                                                ctx.moveTo(i * gridSpacingX, 0)
-                                                ctx.lineTo(i * gridSpacingX, height)
-                                                ctx.stroke()
-                                            }
-                                        }
+                            // Dikey grid çizgileri
+                            var gridSpacingX = width / 10
+                            for (var i = 1; i < 10; i++) {
+                                ctx.beginPath()
+                                ctx.moveTo(i * gridSpacingX, 0)
+                                ctx.lineTo(i * gridSpacingX, height)
+                                ctx.stroke()
+                            }
+                        }
 
-                                        function drawWaveform(ctx) {
-                                            if (reader.waveform.length === 0) return
+                        function drawWaveform(ctx) {
+                            if (reader.waveform.length === 0) return
 
-                                            ctx.strokeStyle = "#006400" // Koyu yeşil
-                                            ctx.lineWidth = 2
-                                            ctx.lineCap = "round"
-                                            ctx.lineJoin = "round"
+                            ctx.strokeStyle = "#006400" // Koyu yeşil
+                            ctx.lineWidth = 2
+                            ctx.lineCap = "round"
+                            ctx.lineJoin = "round"
 
-                                            // Smooth path çizimi
-                                            ctx.beginPath()
+                            // Smooth path çizimi
+                            ctx.beginPath()
 
-                                            var dataPoints = reader.waveform
-                                            var step = width / (dataPoints.length - 1)
+                            var dataPoints = reader.waveform
+                            var step = width / (dataPoints.length - 1)
 
-                                            // İlk nokta
-                                            if (dataPoints.length > 0) {
-                                                var y0 = height - (dataPoints[0] / 255.0 * height)
-                                                ctx.moveTo(0, y0)
+                            // İlk nokta
+                            if (dataPoints.length > 0) {
+                                var y0 = height - (dataPoints[0] / 255.0 * height)
+                                ctx.moveTo(0, y0)
 
-                                                // Bezier curve kullanarak smooth çizgi
-                                                for (var i = 1; i < dataPoints.length; i++) {
-                                                    var x = i * step
-                                                    var y = height - (dataPoints[i] / 255.0 * height)
+                                // Bezier curve kullanarak smooth çizgi
+                                for (var i = 1; i < dataPoints.length; i++) {
+                                    var x = i * step
+                                    var y = height - (dataPoints[i] / 255.0 * height)
 
-                                                    if (i === 1) {
-                                                        ctx.lineTo(x, y)
-                                                    } else {
-                                                        // Smooth curve için control points
-                                                        var prevX = (i-1) * step
-                                                        var prevY = height - (dataPoints[i-1] / 255.0 * height)
+                                    if (i === 1) {
+                                        ctx.lineTo(x, y)
+                                    } else {
+                                        // Smooth curve için control points
+                                        var prevX = (i-1) * step
+                                        var prevY = height - (dataPoints[i-1] / 255.0 * height)
 
-                                                        var cpX1 = prevX + step * 0.3
-                                                        var cpY1 = prevY
-                                                        var cpX2 = x - step * 0.3
-                                                        var cpY2 = y
+                                        var cpX1 = prevX + step * 0.3
+                                        var cpY1 = prevY
+                                        var cpX2 = x - step * 0.3
+                                        var cpY2 = y
 
-                                                        ctx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, x, y)
-                                                    }
-                                                }
-
-                                                ctx.stroke()
-
-                                                // Gölge efekti
-                                                ctx.strokeStyle = "rgba(0, 100, 0, 0.3)" // Şeffaf koyu yeşil
-                                                ctx.lineWidth = 4
-                                                ctx.stroke()
-                                            }
-                                        }
-
-                                        Connections {
-                                            target: reader
-                                            function onWaveformChanged() {
-                                                waveformCanvas.requestPaint()
-                                            }
-                                        }
-                                    }
-
-                                    // Zaman ekseni etiketleri
-                                    Row {
-                                        anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: -25
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.leftMargin: 10
-                                        anchors.rightMargin: 10
-
-                                        Repeater {
-                                            model: ["Now", "-2s", "-4s", "-6s", "-8s", "-10s"]
-                                            Text {
-                                                width: (parent.width / 6)
-                                                text: modelData
-                                                font.pixelSize: 10
-                                                color: "#666666"
-                                                horizontalAlignment: index === 0 ? Text.AlignRight : Text.AlignLeft
-                                            }
-                                        }
+                                        ctx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, x, y)
                                     }
                                 }
+
+                                ctx.stroke()
+
+                                // Gölge efekti
+                                ctx.strokeStyle = "rgba(0, 100, 0, 0.3)" // Şeffaf koyu yeşil
+                                ctx.lineWidth = 4
+                                ctx.stroke()
+                            }
+                        }
+
+                        Connections {
+                            target: reader
+                            function onWaveformChanged() {
+                                waveformCanvas.requestPaint()
+                            }
+                        }
+                    }
+
+                    // Zaman ekseni etiketleri
+                    Row {
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: -25
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+
+                        Repeater {
+                            model: ["Now", "-2s", "-4s", "-6s", "-8s", "-10s"]
+                            Text {
+                                width: (parent.width / 6)
+                                text: modelData
+                                font.pixelSize: 10
+                                color: "#666666"
+                                horizontalAlignment: index === 0 ? Text.AlignRight : Text.AlignLeft
+                            }
+                        }
+                    }
+                }
 
                 // PDF EXPORT BUTONU
                 Button {
@@ -263,6 +274,106 @@ ApplicationWindow {
                 Button {
                     text: "Veri Tablosunu Aç"
                     onClicked: stackView.push(dataPage)
+                }
+            }
+        }
+    }
+
+    // --- AYAR POPUP'I ---
+    Popup {
+        id: settingsPopup
+        width: 300
+        height: 200
+        anchors.centerIn: parent
+        modal: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        Rectangle {
+            anchors.fill: parent
+            color: "white"
+            border.color: "gray"
+            border.width: 1
+            radius: 10
+
+            Column {
+                anchors.centerIn: parent
+                spacing: 20
+
+                Text {
+                    text: "SpO2 Response Time Ayarı"
+                    font.pixelSize: 16
+                    font.bold: true
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                Row {
+                    spacing: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Text {
+                        text: "Response Time:"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    ComboBox {
+                        id: responseTimeCombo
+                        width: 120
+
+                        model: [
+                            { text: "4 saniye", value: 4 },
+                            { text: "8 saniye", value: 8 },
+                            { text: "16 saniye", value: 16 }
+                        ]
+
+                        textRole: "text"
+                        currentIndex: 1 // Varsayılan 8 saniye
+
+                        onCurrentTextChanged: {
+                            console.log("Response time seçildi:", currentText)
+                        }
+                    }
+                }
+
+                Row {
+                    spacing: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Button {
+                        text: "Uygula"
+                        onClicked: {
+                            var selectedValue = responseTimeCombo.model[responseTimeCombo.currentIndex].value
+                            console.log("Uygulanacak response time:", selectedValue)
+
+                            if (reader.setResponseTime(selectedValue)) {
+                                settingsStatusText.text = "Response time " + selectedValue + " saniye olarak ayarlandı"
+                                settingsStatusText.color = "green"
+                            } else {
+                                settingsStatusText.text = "Ayar gönderilemedi!"
+                                settingsStatusText.color = "red"
+                            }
+
+                            settingsStatusTimer.start()
+                        }
+                    }
+
+                    Button {
+                        text: "Kapat"
+                        onClicked: settingsPopup.close()
+                    }
+                }
+
+                Text {
+                    id: settingsStatusText
+                    text: ""
+                    font.pixelSize: 12
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                Timer {
+                    id: settingsStatusTimer
+                    interval: 3000
+                    repeat: false
+                    onTriggered: settingsStatusText.text = ""
                 }
             }
         }
