@@ -34,6 +34,10 @@ public:
     Q_INVOKABLE bool hasActivePatient() const;
     Q_INVOKABLE void refreshData();
 
+    // Yeni filtre metodları
+    Q_INVOKABLE void applyFilter(int spo2Min, int spo2Max, int prMin, int prMax);
+    Q_INVOKABLE void clearFilter();
+
     // Ölçüm kaydetme
     void saveMeasurement(int spo2, int pr);
 
@@ -42,10 +46,15 @@ signals:
 
 private:
     void loadDataFromDatabase();
+    void loadFilteredDataFromDatabase(int spo2Min, int spo2Max, int prMin, int prMax);
 
     QList<QVariantMap> m_data;
     DatabaseManager m_dbManager;
     int m_currentPatientId;
+
+    // Filtre durumu
+    bool m_filterActive;
+    int m_spo2Min, m_spo2Max, m_prMin, m_prMax;
 };
 
 #endif // MEASUREMENTLISTMODEL_H

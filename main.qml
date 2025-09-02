@@ -393,6 +393,111 @@ ApplicationWindow {
                 spacing: 10
                 padding: 10
 
+                // FİLTRE ALANI
+                Rectangle {
+                    width: parent.width
+                    height: 120
+                    color: "#f0f0f0"
+                    border.color: "gray"
+                    border.width: 1
+                    radius: 5
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 10
+
+                        Text {
+                            text: "📊 Filtre Ayarları"
+                            font.pixelSize: 14
+                            font.bold: true
+                        }
+
+                        Row {
+                            spacing: 20
+                            width: parent.width
+
+                            // SpO2 Filtresi
+                            Column {
+                                spacing: 5
+                                Text { text: "SpO₂ Aralığı:"; font.pixelSize: 12 }
+                                Row {
+                                    spacing: 5
+                                    SpinBox {
+                                        id: spo2MinSpin
+                                        from: 0; to: 100; value: 0
+                                        editable: true   // Bu çok önemli!
+                                        validator: IntValidator { bottom: 0; top: 100 }
+                                        width: 80
+                                    }
+                                    Text { text: "-"; anchors.verticalCenter: parent.verticalCenter }
+                                    SpinBox {
+                                        id: spo2MaxSpin
+                                        from: 0; to: 100; value: 0
+                                        editable: true   // Bu çok önemli!
+                                        validator: IntValidator { bottom: 0; top: 100 }
+                                        width: 80
+                                    }
+                                }
+                            }
+
+                            // PR Filtresi
+                            Column {
+                                spacing: 5
+                                Text { text: "PR Aralığı:"; font.pixelSize: 12 }
+                                Row {
+                                    spacing: 5
+                                    SpinBox {
+                                        id: prMinSpin
+                                        from: 0; to: 300; value: 0
+                                        editable: true   // Bu çok önemli!
+                                        validator: IntValidator { bottom: 0; top: 100 }
+                                        width: 80
+                                    }
+                                    Text { text: "-"; anchors.verticalCenter: parent.verticalCenter }
+                                    SpinBox {
+                                        id: prMaxSpin
+                                        from: 0; to: 300; value: 0
+                                        editable: true   // Bu çok önemli!
+                                        validator: IntValidator { bottom: 0; top: 100 }
+                                        width: 80
+                                    }
+                                }
+                            }
+
+                            // Filtre Butonları
+                            Column {
+                                spacing: 5
+                                Text { text: " "; font.pixelSize: 12 } // Boşluk için
+                                Row {
+                                    spacing: 10
+                                    Button {
+                                        text: "Filtrele"
+                                        onClicked: {
+                                            measurementModel.applyFilter(
+                                                spo2MinSpin.value,
+                                                spo2MaxSpin.value,
+                                                prMinSpin.value,
+                                                prMaxSpin.value
+                                            )
+                                        }
+                                    }
+                                    Button {
+                                        text: "Temizle"
+                                        onClicked: {
+                                            spo2MinSpin.value = 0
+                                            spo2MaxSpin.value = 0
+                                            prMinSpin.value = 0
+                                            prMaxSpin.value = 0
+                                            measurementModel.clearFilter()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Başlık satırı
                 Row {
                     spacing: 80
@@ -422,7 +527,7 @@ ApplicationWindow {
                     id: dataListView
                     visible: measurementModel.rowCount() > 0
                     width: parent.width
-                    height: parent.height - 150
+                    height: parent.height - 280 // Filtre alanı için daha az yükseklik
                     model: measurementModel
                     clip: true
 
@@ -430,8 +535,14 @@ ApplicationWindow {
                         spacing: 80
                         Text { text: first_name || ""; width: 80 }
                         Text { text: last_name || ""; width: 80 }
-                        Text { text: spo2 || ""; width: 50 }
-                        Text { text: pr || ""; width: 50 }
+                        Text {
+                            text: spo2 || ""; width: 50;
+                            color: spo2 < 90 ? "red" : spo2 < 95 ? "orange" : "black"
+                        }
+                        Text {
+                            text: pr || ""; width: 50;
+                            color: pr < 60 || pr > 100 ? "red" : "black"
+                        }
                         Text { text: timestamp || ""; width: 150 }
                     }
                 }

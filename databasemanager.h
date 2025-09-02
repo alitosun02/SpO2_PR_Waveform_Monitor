@@ -21,6 +21,9 @@ public:
     void saveMeasurement(int patientId, int spo2, int pr);
     QVariantList getAllData() const;
 
+    // Yeni filtre fonksiyonları
+    QVariantList getFilteredData(int spo2Min, int spo2Max, int prMin, int prMax) const;
+
     // Veritabanı nesnesine erişim
     QSqlDatabase& db() { return m_db; }
     const QSqlDatabase& db() const { return m_db; }

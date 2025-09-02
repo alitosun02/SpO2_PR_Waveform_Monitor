@@ -98,8 +98,8 @@ void DatabaseManager::saveMeasurement(int patientId, int spo2, int pr)
 QVariantList DatabaseManager::getAllData() const
 {
     QVariantList list;
-
     QSqlQuery q(m_db);
+
     q.prepare("SELECT p.first_name, p.last_name, m.spo2, m.pr, "
               "strftime('%Y-%m-%d %H:%M:%S', m.timestamp) AS formatted_time "
               "FROM measurements m "
@@ -122,5 +122,71 @@ QVariantList DatabaseManager::getAllData() const
     }
 
     qDebug() << "getAllData() - dönen kayıt sayısı:" << list.count();
+    return list;
+}
+
+// YENİ FİLTRE FONKSİYONU
+QVariantList DatabaseManager::getFilteredData(int spo2Min, int spo2Max, int prMin, int prMax) const
+{
+    QVariantList list;
+    QSqlQuery q(m_db);
+
+    QString queryString = "SELECT p.first_name, p.last_name, m.spo2, m.pr, "
+                          "strftime('%Y-%m-%d %H:%M:%S', m.timestamp) AS formatted_time "
+                          "FROM measurements m "
+                          "JOIN patients p ON m.patient_id = p.id "
+                          "WHERE 1=1 ";
+
+    // SpO2 filtresi ekle
+    if (spo2Min > 0) {
+        queryString += "AND m.spo2 >= :spo2Min ";
+    }
+    if (spo2Max > 0 && spo2Max < 100) {
+        queryString += "AND m.spo2 <= :spo2Max ";
+    }
+
+    // PR filtresi ekle
+    if (prMin > 0) {
+        queryString += "AND m.pr >= :prMin ";
+    }
+    if (prMax > 0) {
+        queryString += "AND m.pr <= :prMax ";
+    }
+
+    queryString += "ORDER BY m.timestamp DESC";
+
+    q.prepare(queryString);
+
+    // Parametreleri bağla
+    if (spo2Min > 0) {
+        q.bindValue(":spo2Min", spo2Min);
+    }
+    if (spo2Max > 0 && spo2Max < 100) {
+        q.bindValue(":spo2Max", spo2Max);
+    }
+    if (prMin > 0) {
+        q.bindValue(":prMin", prMin);
+    }
+    if (prMax > 0) {
+        q.bindValue(":prMax", prMax);
+    }
+
+    if (!q.exec()) {
+        qCritical() << "getFilteredData() SQL hatası:" << q.lastError().text();
+        return list;
+    }
+
+    while (q.next()) {
+        QVariantMap record;
+        record["first_name"] = q.value(0).toString();
+        record["last_name"] = q.value(1).toString();
+        record["spo2"] = q.value(2).toInt();
+        record["pr"] = q.value(3).toInt();
+        record["timestamp"] = q.value(4).toString();
+        list.append(record);
+    }
+
+    qDebug() << QString("getFilteredData() - SpO2(%1-%2) PR(%3-%4) - dönen kayıt: %5")
+                    .arg(spo2Min).arg(spo2Max).arg(prMin).arg(prMax).arg(list.count());
     return list;
 }

@@ -5,6 +5,8 @@ MeasurementListModel::MeasurementListModel(QObject *parent)
     : QAbstractListModel(parent)
     , m_dbManager(this)
     , m_currentPatientId(-1)
+    , m_filterActive(false)
+    , m_spo2Min(0), m_spo2Max(0), m_prMin(0), m_prMax(0)
 {
     // Başlangıçta mevcut verileri yükle
     refreshData();
@@ -87,22 +89,71 @@ void MeasurementListModel::saveMeasurement(int spo2, int pr)
 void MeasurementListModel::refreshData()
 {
     qDebug() << "Model: Veriler yenileniyor...";
-    loadDataFromDatabase();
+
+    if (m_filterActive) {
+        // Filtre aktifse filtrelenmiş veriyi yükle
+        loadFilteredDataFromDatabase(m_spo2Min, m_spo2Max, m_prMin, m_prMax);
+    } else {
+        // Normal veri yükleme
+        loadDataFromDatabase();
+    }
 }
 
 void MeasurementListModel::loadDataFromDatabase()
 {
     beginResetModel();
-
     m_data.clear();
-    QVariantList dbData = m_dbManager.getAllData();
 
+    QVariantList dbData = m_dbManager.getAllData();
     for (const QVariant &item : dbData) {
         m_data.append(item.toMap());
     }
 
     endResetModel();
     qDebug() << "Model: Yenilendi. Kayıt sayısı:" << m_data.count();
+}
+
+void MeasurementListModel::loadFilteredDataFromDatabase(int spo2Min, int spo2Max, int prMin, int prMax)
+{
+    beginResetModel();
+    m_data.clear();
+
+    QVariantList dbData = m_dbManager.getFilteredData(spo2Min, spo2Max, prMin, prMax);
+    for (const QVariant &item : dbData) {
+        m_data.append(item.toMap());
+    }
+
+    endResetModel();
+    qDebug() << "Model: Filtrelenmiş veri yenilendi. Kayıt sayısı:" << m_data.count();
+}
+
+// YENİ FİLTRE FONKSİYONLARI
+
+void MeasurementListModel::applyFilter(int spo2Min, int spo2Max, int prMin, int prMax)
+{
+    qDebug() << QString("Model: Filtre uygulanıyor - SpO2(%1-%2) PR(%3-%4)")
+                    .arg(spo2Min).arg(spo2Max).arg(prMin).arg(prMax);
+
+    m_filterActive = true;
+    m_spo2Min = spo2Min;
+    m_spo2Max = spo2Max;
+    m_prMin = prMin;
+    m_prMax = prMax;
+
+    loadFilteredDataFromDatabase(spo2Min, spo2Max, prMin, prMax);
+}
+
+void MeasurementListModel::clearFilter()
+{
+    qDebug() << "Model: Filtre temizleniyor";
+
+    m_filterActive = false;
+    m_spo2Min = 0;
+    m_spo2Max = 0;
+    m_prMin = 0;
+    m_prMax = 0;
+
+    loadDataFromDatabase();
 }
 
 QString MeasurementListModel::getLastPatientName() const
