@@ -1,5 +1,6 @@
 QT += core serialport sql quick qml quickcontrols2 charts printsupport
 
+
 CONFIG += console c++17 qml_debug
 
 SOURCES += main.cpp \
