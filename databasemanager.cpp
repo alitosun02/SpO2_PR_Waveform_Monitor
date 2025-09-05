@@ -1,4 +1,7 @@
 #include "databasemanager.h"
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QDebug>
 
 DatabaseManager::DatabaseManager(QObject *parent)
     : QObject(parent)
@@ -25,7 +28,7 @@ bool DatabaseManager::initializeDatabase()
 
     QSqlQuery q(m_db);
 
-    // Patients tablosu
+    // Patients tablosu oluştur
     if (!q.exec("CREATE TABLE IF NOT EXISTS patients ("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 "first_name TEXT NOT NULL,"
@@ -35,7 +38,7 @@ bool DatabaseManager::initializeDatabase()
         return false;
     }
 
-    // Measurements tablosu
+    // Measurements tablosu oluştur
     if (!q.exec("CREATE TABLE IF NOT EXISTS measurements ("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 "patient_id INTEGER NOT NULL,"
@@ -53,8 +56,6 @@ bool DatabaseManager::initializeDatabase()
 
 bool DatabaseManager::addPatient(const QString &firstName, const QString &lastName, int &newPatientId)
 {
-    qDebug() << "addPatient çağrıldı. Ad:" << firstName << "Soyad:" << lastName;
-
     if (firstName.isEmpty() || lastName.isEmpty()) {
         qWarning() << "Ad ve soyad boş olamaz";
         return false;
@@ -71,7 +72,6 @@ bool DatabaseManager::addPatient(const QString &firstName, const QString &lastNa
     }
 
     newPatientId = q.lastInsertId().toInt();
-    qDebug() << "Hasta eklendi. ID =" << newPatientId;
     return true;
 }
 
@@ -90,11 +90,10 @@ void DatabaseManager::saveMeasurement(int patientId, int spo2, int pr)
 
     if (!q.exec()) {
         qCritical() << "Ölçüm kaydedilemedi:" << q.lastError().text();
-    } else {
-        qDebug() << "Ölçüm kaydedildi - Hasta ID:" << patientId << "SpO2:" << spo2 << "PR:" << pr;
     }
 }
 
+// Tüm verileri güvenli şekilde döndür
 QVariantList DatabaseManager::getAllData() const
 {
     QVariantList list;
@@ -113,19 +112,18 @@ QVariantList DatabaseManager::getAllData() const
 
     while (q.next()) {
         QVariantMap record;
-        record["first_name"] = q.value(0).toString();
-        record["last_name"] = q.value(1).toString();
-        record["spo2"] = q.value(2).toInt();
-        record["pr"] = q.value(3).toInt();
-        record["timestamp"] = q.value(4).toString();
+        record["first_name"] = q.value("first_name");
+        record["last_name"] = q.value("last_name");
+        record["spo2"] = q.value("spo2");
+        record["pr"] = q.value("pr");
+        record["timestamp"] = q.value("formatted_time");
         list.append(record);
     }
 
-    qDebug() << "getAllData() - dönen kayıt sayısı:" << list.count();
     return list;
 }
 
-// YENİ FİLTRE FONKSİYONU
+// FİLTRELENMİŞ VERİLERİ GÜVENLİ ŞEKİLDE DÖNDÜR
 QVariantList DatabaseManager::getFilteredData(int spo2Min, int spo2Max, int prMin, int prMax) const
 {
     QVariantList list;
@@ -137,56 +135,35 @@ QVariantList DatabaseManager::getFilteredData(int spo2Min, int spo2Max, int prMi
                           "JOIN patients p ON m.patient_id = p.id "
                           "WHERE 1=1 ";
 
-    // SpO2 filtresi ekle
-    if (spo2Min > 0) {
-        queryString += "AND m.spo2 >= :spo2Min ";
-    }
-    if (spo2Max > 0 && spo2Max < 100) {
-        queryString += "AND m.spo2 <= :spo2Max ";
-    }
-
-    // PR filtresi ekle
-    if (prMin > 0) {
-        queryString += "AND m.pr >= :prMin ";
-    }
-    if (prMax > 0) {
-        queryString += "AND m.pr <= :prMax ";
-    }
+    if (spo2Min > 0) queryString += "AND m.spo2 >= :spo2Min ";
+    if (spo2Max > 0 && spo2Max <= 100) queryString += "AND m.spo2 <= :spo2Max ";
+    if (prMin > 0) queryString += "AND m.pr >= :prMin ";
+    if (prMax > 0 && prMax <= 300) queryString += "AND m.pr <= :prMax ";
 
     queryString += "ORDER BY m.timestamp DESC";
 
     q.prepare(queryString);
 
-    // Parametreleri bağla
-    if (spo2Min > 0) {
-        q.bindValue(":spo2Min", spo2Min);
-    }
-    if (spo2Max > 0 && spo2Max < 100) {
-        q.bindValue(":spo2Max", spo2Max);
-    }
-    if (prMin > 0) {
-        q.bindValue(":prMin", prMin);
-    }
-    if (prMax > 0) {
-        q.bindValue(":prMax", prMax);
-    }
+    // Parametreleri güvenli şekilde bağla
+    if (spo2Min > 0) q.bindValue(":spo2Min", spo2Min);
+    if (spo2Max > 0 && spo2Max <= 100) q.bindValue(":spo2Max", spo2Max);
+    if (prMin > 0) q.bindValue(":prMin", prMin);
+    if (prMax > 0 && prMax <= 300) q.bindValue(":prMax", prMax);
 
     if (!q.exec()) {
-        qCritical() << "getFilteredData() SQL hatası:" << q.lastError().text();
+        qWarning() << "getFilteredData SQL Error:" << q.lastError().text();
         return list;
     }
 
     while (q.next()) {
         QVariantMap record;
-        record["first_name"] = q.value(0).toString();
-        record["last_name"] = q.value(1).toString();
-        record["spo2"] = q.value(2).toInt();
-        record["pr"] = q.value(3).toInt();
-        record["timestamp"] = q.value(4).toString();
+        record["first_name"] = q.value("first_name");
+        record["last_name"] = q.value("last_name");
+        record["spo2"] = q.value("spo2");
+        record["pr"] = q.value("pr");
+        record["timestamp"] = q.value("formatted_time");
         list.append(record);
     }
 
-    qDebug() << QString("getFilteredData() - SpO2(%1-%2) PR(%3-%4) - dönen kayıt: %5")
-                    .arg(spo2Min).arg(spo2Max).arg(prMin).arg(prMax).arg(list.count());
     return list;
 }

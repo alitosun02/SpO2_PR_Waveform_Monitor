@@ -14,21 +14,65 @@ ApplicationWindow {
         initialItem: mainPage
     }
 
+    // --- AYARLAR POPUP (EKRANIN ORTASINDA) ---
+    Popup {
+        id: settingsPopup
+        width: 300
+        height: 200
+        modal: true
+        // Popup'ı tam ortaya yerleştir
+        anchors.centerIn: Overlay.overlay
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 10
+
+            Text { text: "Ayarlar"; font.pixelSize: 16; font.bold: true }
+
+            // Örnek ayar kontrolleri
+            CheckBox { text: "Bildirimleri Aç"; checked: true }
+            CheckBox { text: "Dark Mode"; checked: false }
+
+            Button { text: "Kapat"; onClicked: settingsPopup.close() }
+        }
+    }
+
     // --- ANA SAYFA ---
     Component {
         id: mainPage
         Page {
             title: "Ana Sayfa"
 
-            // AYAR BUTONU - Sağ üst köşe
             Button {
                 id: settingsButton
-                text: "⚙️ Ayarlar"
+                text: "⚙️Ayarlar"
                 anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.margins: 20
-                onClicked: settingsPopup.open()
+
+                onClicked: settingsMenu.popup(settingsButton)
             }
+
+            // --- Popup Menü ---
+            Menu {
+                id: settingsMenu
+                title: "Response Time Seçin"
+
+                MenuItem {
+                    text: "4"
+                    onTriggered: reader.setResponseTime(4)
+                }
+                MenuItem {
+                    text: "8"
+                    onTriggered: reader.setResponseTime(8)
+                }
+                MenuItem {
+                    text: "16"
+                    onTriggered: reader.setResponseTime(16)
+                }
+            }
+
 
             Column {
                 anchors.centerIn: parent
@@ -84,12 +128,12 @@ ApplicationWindow {
                     }
                 }
 
-                // WAVEFORM - Gelişmiş versiyon
+                // WAVEFORM
                 Text { text: "Waveform:"; font.pixelSize: 20 }
 
                 Rectangle {
                     width: 520; height: 170
-                    color: "#F5F5DC" // Bej arka plan
+                    color: "#F5F5DC"
                     border.color: "black"
                     border.width: 2
 
@@ -102,10 +146,7 @@ ApplicationWindow {
                             var ctx = getContext("2d")
                             ctx.clearRect(0, 0, width, height)
 
-                            // Grid çizgilerini çiz
                             drawGrid(ctx)
-
-                            // Waveform çiz
                             drawWaveform(ctx)
                         }
 
@@ -131,7 +172,7 @@ ApplicationWindow {
                         }
 
                         function drawWaveform(ctx) {
-                            if (reader.waveform.length === 0) return
+                            if (!reader.waveform || reader.waveform.length === 0) return
 
                             ctx.strokeStyle = "#006400"
                             ctx.lineWidth = 2
@@ -141,47 +182,36 @@ ApplicationWindow {
                             ctx.beginPath()
 
                             var dataPoints = reader.waveform
-                            var step = width / (dataPoints.length - 1)
+                            var step = width / Math.max((dataPoints.length - 1), 1)
 
-                            if (dataPoints.length > 0) {
-                                var y0 = height - (dataPoints[0] / 255.0 * height)
-                                ctx.moveTo(0, y0)
+                            var y0 = height - (dataPoints[0] / 255.0 * height)
+                            ctx.moveTo(0, y0)
 
-                                for (var i = 1; i < dataPoints.length; i++) {
-                                    var x = i * step
-                                    var y = height - (dataPoints[i] / 255.0 * height)
+                            for (var i = 1; i < dataPoints.length; i++) {
+                                var x = i * step
+                                var y = height - (dataPoints[i] / 255.0 * height)
+                                var prevX = (i-1) * step
+                                var prevY = height - (dataPoints[i-1] / 255.0 * height)
 
-                                    if (i === 1) {
-                                        ctx.lineTo(x, y)
-                                    } else {
-                                        var prevX = (i-1) * step
-                                        var prevY = height - (dataPoints[i-1] / 255.0 * height)
+                                var cpX1 = prevX + step * 0.3
+                                var cpY1 = prevY
+                                var cpX2 = x - step * 0.3
+                                var cpY2 = y
 
-                                        var cpX1 = prevX + step * 0.3
-                                        var cpY1 = prevY
-                                        var cpX2 = x - step * 0.3
-                                        var cpY2 = y
-
-                                        ctx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, x, y)
-                                    }
-                                }
-
-                                ctx.stroke()
-                                ctx.strokeStyle = "rgba(0, 100, 0, 0.3)"
-                                ctx.lineWidth = 4
-                                ctx.stroke()
+                                ctx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, x, y)
                             }
+
+                            ctx.stroke()
                         }
 
                         Connections {
                             target: reader
                             function onWaveformChanged() {
-                                waveformCanvas.requestPaint()
+                                if (!reader.frozen) waveformCanvas.requestPaint()
                             }
                         }
                     }
 
-                    // Zaman ekseni etiketleri
                     Row {
                         anchors.bottom: parent.bottom
                         anchors.bottomMargin: -25
@@ -203,20 +233,19 @@ ApplicationWindow {
                     }
                 }
 
-                // PDF EXPORT BUTONU
+                // EK BOŞLUK - PDF butonu için daha fazla boşluk
+                Item {
+                    width: 1
+                    height: 30
+                }
+
+                // PDF EXPORT
                 Button {
                     text: "Waveform'u PDF Olarak Kaydet"
                     enabled: measurementModel.hasActivePatient
 
                     onClicked: {
-                        var patientName = ""
-
-                        if (firstNameField.text.trim() !== "" && lastNameField.text.trim() !== "") {
-                            patientName = firstNameField.text.trim() + " " + lastNameField.text.trim()
-                        } else {
-                            patientName = measurementModel.getLastPatientName()
-                        }
-
+                        var patientName = measurementModel.getLastPatientName()
                         var success = pdfExporter.exportWaveformToPdf(
                             waveformCanvas,
                             patientName,
@@ -224,24 +253,16 @@ ApplicationWindow {
                             reader.pr
                         )
 
-                        if (success) {
-                            statusText.text = "PDF başarıyla masaüstüne kaydedildi!"
-                            statusText.color = "green"
-                        } else {
-                            statusText.text = "PDF kaydedilirken hata oluştu!"
-                            statusText.color = "red"
-                        }
-
+                        statusText.text = success ? "PDF başarıyla kaydedildi!" : "PDF kaydedilirken hata oluştu!"
+                        statusText.color = success ? "green" : "red"
                         statusTimer.start()
                     }
                 }
 
-                // DURUM MESAJI
                 Text {
                     id: statusText
                     text: ""
                     font.pixelSize: 14
-                    color: "green"
                 }
 
                 Timer {
@@ -251,7 +272,6 @@ ApplicationWindow {
                     onTriggered: statusText.text = ""
                 }
 
-                // VERİ SAYFASINA GEÇ & FREEZE BUTONU
                 Row {
                     spacing: 20
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -276,103 +296,8 @@ ApplicationWindow {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-                        onClicked: {
-                            reader.toggleFreeze()
-                            if (reader.frozen) {
-                                console.log("❄️ Waveform donduruldu")
-                            } else {
-                                console.log("🔥 Waveform devam ediyor")
-                            }
-                        }
+                        onClicked: reader.toggleFreeze()
                     }
-                }
-            }
-        }
-    }
-
-    // --- AYAR POPUP'I ---
-    Popup {
-        id: settingsPopup
-        width: 300
-        height: 200
-        anchors.centerIn: parent
-        modal: true
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-        Rectangle {
-            anchors.fill: parent
-            color: "white"
-            border.color: "gray"
-            border.width: 1
-            radius: 10
-
-            Column {
-                anchors.centerIn: parent
-                spacing: 20
-
-                Text {
-                    text: "SpO2 Response Time Ayarı"
-                    font.pixelSize: 16
-                    font.bold: true
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
-
-                Row {
-                    spacing: 10
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    Text {
-                        text: "Response Time:"; anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    ComboBox {
-                        id: responseTimeCombo
-                        width: 120
-                        model: [
-                            { text: "4 saniye", value: 4 },
-                            { text: "8 saniye", value: 8 },
-                            { text: "16 saniye", value: 16 }
-                        ]
-                        textRole: "text"
-                        currentIndex: 1
-                        onCurrentTextChanged: console.log("Response time seçildi:", currentText)
-                    }
-                }
-
-                Row {
-                    spacing: 10
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    Button {
-                        text: "Uygula"
-                        onClicked: {
-                            var selectedValue = responseTimeCombo.model[responseTimeCombo.currentIndex].value
-                            if (reader.setResponseTime(selectedValue)) {
-                                settingsStatusText.text = "Response time " + selectedValue + " saniye olarak ayarlandı"
-                                settingsStatusText.color = "green"
-                            } else {
-                                settingsStatusText.text = "Ayar gönderilemedi!"
-                                settingsStatusText.color = "red"
-                            }
-                            settingsStatusTimer.start()
-                        }
-                    }
-
-                    Button { text: "Kapat"; onClicked: settingsPopup.close() }
-                }
-
-                Text {
-                    id: settingsStatusText
-                    text: ""
-                    font.pixelSize: 12
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
-
-                Timer {
-                    id: settingsStatusTimer
-                    interval: 3000
-                    repeat: false
-                    onTriggered: settingsStatusText.text = ""
                 }
             }
         }
@@ -404,11 +329,7 @@ ApplicationWindow {
                         anchors.margins: 10
                         spacing: 10
 
-                        Text {
-                            text: "📊 Filtre Ayarları"
-                            font.pixelSize: 14
-                            font.bold: true
-                        }
+                        Text { text: "📊 Filtre Ayarları"; font.pixelSize: 14; font.bold: true }
 
                         Row {
                             spacing: 20
@@ -421,7 +342,7 @@ ApplicationWindow {
                                     spacing: 5
                                     SpinBox { id: spo2MinSpin; from:0; to:100; value:0; editable:true; width:80 }
                                     Text { text: "-"; anchors.verticalCenter: parent.verticalCenter }
-                                    SpinBox { id: spo2MaxSpin; from:0; to:100; value:0; editable:true; width:80 }
+                                    SpinBox { id: spo2MaxSpin; from:0; to:100; value:100; editable:true; width:80 }
                                 }
                             }
 
@@ -432,7 +353,7 @@ ApplicationWindow {
                                     spacing: 5
                                     SpinBox { id: prMinSpin; from:0; to:300; value:0; editable:true; width:80 }
                                     Text { text: "-"; anchors.verticalCenter: parent.verticalCenter }
-                                    SpinBox { id: prMaxSpin; from:0; to:300; value:0; editable:true; width:80 }
+                                    SpinBox { id: prMaxSpin; from:0; to:300; value:200; editable:true; width:80 }
                                 }
                             }
 
@@ -443,13 +364,19 @@ ApplicationWindow {
                                     spacing: 10
                                     Button {
                                         text: "Filtrele"
-                                        onClicked: measurementModel.applyFilter(spo2MinSpin.value, spo2MaxSpin.value, prMinSpin.value, prMaxSpin.value)
+                                        onClicked: {
+                                            var minS = Math.min(spo2MinSpin.value, spo2MaxSpin.value)
+                                            var maxS = Math.max(spo2MinSpin.value, spo2MaxSpin.value)
+                                            var minP = Math.min(prMinSpin.value, prMaxSpin.value)
+                                            var maxP = Math.max(prMinSpin.value, prMaxSpin.value)
+                                            measurementModel.applyFilter(minS, maxS, minP, maxP)
+                                        }
                                     }
                                     Button {
                                         text: "Temizle"
                                         onClicked: {
-                                            spo2MinSpin.value=0; spo2MaxSpin.value=0
-                                            prMinSpin.value=0; prMaxSpin.value=0
+                                            spo2MinSpin.value=0; spo2MaxSpin.value=100
+                                            prMinSpin.value=0; prMaxSpin.value=200
                                             measurementModel.clearFilter()
                                         }
                                     }
