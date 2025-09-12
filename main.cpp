@@ -11,7 +11,10 @@
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
 
-    QQmlApplicationEngine engine;
+    qDebug() << "UI Thread ID (main thread):" << QThread::currentThreadId();
+
+
+    QQmlApplicationEngine engine;    
 
     // Model oluştur
     MeasurementListModel model;

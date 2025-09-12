@@ -3,8 +3,6 @@
 
 #include <QAbstractListModel>
 #include <QVariantMap>
-#include <QSqlQuery>
-#include <QSqlError>
 #include "databasemanager.h"
 
 class MeasurementListModel : public QAbstractListModel
@@ -44,17 +42,30 @@ public:
 signals:
     void activePatientChanged(bool ready);
 
+private slots:
+    // DatabaseManager'dan gelen sinyalleri işle
+    void onDatabaseReady();
+    void onPatientAdded(int newPatientId, bool success);
+    void onMeasurementSaved(bool success);
+    void onDataLoaded(const QVariantList &data);
+    void onFilteredDataLoaded(const QVariantList &data);
+    void onDatabaseError(const QString &message);
+
 private:
-    void loadDataFromDatabase();
-    void loadFilteredDataFromDatabase(int spo2Min, int spo2Max, int prMin, int prMax);
+    void setupDatabaseConnections();
+    void updateModelData(const QVariantList &data);
 
     QList<QVariantMap> m_data;
-    DatabaseManager m_dbManager;
+    DatabaseManager *m_dbManager;
     int m_currentPatientId;
 
     // Filtre durumu
     bool m_filterActive;
     int m_spo2Min, m_spo2Max, m_prMin, m_prMax;
+
+    // Pending işlemler için bayraklar
+    bool m_addPatientPending;
+    QString m_pendingFirstName, m_pendingLastName;
 };
 
 #endif // MEASUREMENTLISTMODEL_H

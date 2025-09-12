@@ -1,169 +1,127 @@
 #include "databasemanager.h"
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QDebug>
 
 DatabaseManager::DatabaseManager(QObject *parent)
     : QObject(parent)
+    , m_workerThread(nullptr)
+    , m_worker(nullptr)
+    , m_isReady(false)
 {
-    initializeDatabase();
+    setupWorker();
 }
 
 DatabaseManager::~DatabaseManager()
 {
-    if (m_db.isOpen()) {
-        m_db.close();
+    if (m_workerThread) {
+        m_workerThread->quit();
+        if (!m_workerThread->wait(3000)) {
+            qWarning() << "DatabaseManager: Worker thread sonlandırılamadı, zorla kapatılıyor";
+            m_workerThread->terminate();
+            m_workerThread->wait(1000);
+        }
+
+        m_workerThread->deleteLater();
+        m_workerThread = nullptr;
+    }
+
+    if (m_worker) {
+        m_worker->deleteLater();
+        m_worker = nullptr;
     }
 }
 
-bool DatabaseManager::initializeDatabase()
+void DatabaseManager::setupWorker()
 {
-    m_db = QSqlDatabase::addDatabase("QSQLITE");
-    m_db.setDatabaseName("patients.db");
+    // Worker thread oluştur
+    m_workerThread = new QThread(this);
+    m_worker = new DatabaseWorker();
 
-    if (!m_db.open()) {
-        qCritical() << "Veritabanı açılamadı:" << m_db.lastError().text();
-        return false;
-    }
+    // Worker'ı thread'e taşı
+    m_worker->moveToThread(m_workerThread);
 
-    QSqlQuery q(m_db);
+    // Sinyalleri bağla - Manager'dan Worker'a
+    connect(this, &DatabaseManager::initializeDatabase,
+            m_worker, &DatabaseWorker::initializeDatabase);
+    connect(this, &DatabaseManager::requestAddPatient,
+            m_worker, &DatabaseWorker::addPatient);
+    connect(this, &DatabaseManager::requestSaveMeasurement,
+            m_worker, &DatabaseWorker::saveMeasurement);
+    connect(this, &DatabaseManager::requestLoadAllData,
+            m_worker, &DatabaseWorker::loadAllData);
+    connect(this, &DatabaseManager::requestLoadFilteredData,
+            m_worker, &DatabaseWorker::loadFilteredData);
 
-    // Patients tablosu oluştur
-    if (!q.exec("CREATE TABLE IF NOT EXISTS patients ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "first_name TEXT NOT NULL,"
-                "last_name TEXT NOT NULL,"
-                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")) {
-        qCritical() << "Patients tablosu oluşturulamadı:" << q.lastError().text();
-        return false;
-    }
+    // Sinyalleri bağla - Worker'dan Manager'a (ve dışarı aktar)
+    connect(m_worker, &DatabaseWorker::databaseReady, this, [this]() {
+        m_isReady = true;
+        emit databaseReady();
+        qDebug() << "DatabaseManager: Veritabanı hazır";
+    });
 
-    // Measurements tablosu oluştur
-    if (!q.exec("CREATE TABLE IF NOT EXISTS measurements ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "patient_id INTEGER NOT NULL,"
-                "spo2 INTEGER NOT NULL,"
-                "pr INTEGER NOT NULL,"
-                "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                "FOREIGN KEY(patient_id) REFERENCES patients(id))")) {
-        qCritical() << "Measurements tablosu oluşturulamadı:" << q.lastError().text();
-        return false;
-    }
+    connect(m_worker, &DatabaseWorker::patientAdded,
+            this, &DatabaseManager::patientAdded);
+    connect(m_worker, &DatabaseWorker::measurementSaved,
+            this, &DatabaseManager::measurementSaved);
+    connect(m_worker, &DatabaseWorker::dataLoaded,
+            this, &DatabaseManager::dataLoaded);
+    connect(m_worker, &DatabaseWorker::filteredDataLoaded,
+            this, &DatabaseManager::filteredDataLoaded);
+    connect(m_worker, &DatabaseWorker::error,
+            this, &DatabaseManager::error);
 
-    qDebug() << "Veritabanı başarıyla başlatıldı";
-    return true;
+    // Thread temizleme
+    connect(m_workerThread, &QThread::finished,
+            m_worker, &DatabaseWorker::deleteLater);
+
+    // Thread'i başlat ve veritabanını initialize et
+    m_workerThread->start();
+
+    // Veritabanını başlat
+    emit initializeDatabase();
+
+    qDebug() << "DatabaseManager: Worker thread başlatıldı";
 }
 
-bool DatabaseManager::addPatient(const QString &firstName, const QString &lastName, int &newPatientId)
+void DatabaseManager::addPatient(const QString &firstName, const QString &lastName)
 {
-    if (firstName.isEmpty() || lastName.isEmpty()) {
-        qWarning() << "Ad ve soyad boş olamaz";
-        return false;
+    if (!m_isReady) {
+        qWarning() << "DatabaseManager: Veritabanı henüz hazır değil";
+        emit patientAdded(-1, false);
+        return;
     }
 
-    QSqlQuery q(m_db);
-    q.prepare("INSERT INTO patients (first_name, last_name) VALUES (:firstName, :lastName)");
-    q.bindValue(":firstName", firstName);
-    q.bindValue(":lastName", lastName);
-
-    if (!q.exec()) {
-        qCritical() << "Hasta eklenemedi:" << q.lastError().text();
-        return false;
-    }
-
-    newPatientId = q.lastInsertId().toInt();
-    return true;
+    emit requestAddPatient(firstName, lastName);
 }
 
 void DatabaseManager::saveMeasurement(int patientId, int spo2, int pr)
 {
-    if (patientId <= 0) {
-        qWarning() << "Geçersiz hasta ID:" << patientId;
+    if (!m_isReady) {
+        qWarning() << "DatabaseManager: Veritabanı henüz hazır değil";
+        emit measurementSaved(false);
         return;
     }
 
-    QSqlQuery q(m_db);
-    q.prepare("INSERT INTO measurements (patient_id, spo2, pr) VALUES (:patientId, :spo2, :pr)");
-    q.bindValue(":patientId", patientId);
-    q.bindValue(":spo2", spo2);
-    q.bindValue(":pr", pr);
-
-    if (!q.exec()) {
-        qCritical() << "Ölçüm kaydedilemedi:" << q.lastError().text();
-    }
+    emit requestSaveMeasurement(patientId, spo2, pr);
 }
 
-// Tüm verileri güvenli şekilde döndür
-QVariantList DatabaseManager::getAllData() const
+void DatabaseManager::loadAllData()
 {
-    QVariantList list;
-    QSqlQuery q(m_db);
-
-    q.prepare("SELECT p.first_name, p.last_name, m.spo2, m.pr, "
-              "strftime('%Y-%m-%d %H:%M:%S', m.timestamp) AS formatted_time "
-              "FROM measurements m "
-              "JOIN patients p ON m.patient_id = p.id "
-              "ORDER BY m.timestamp DESC");
-
-    if (!q.exec()) {
-        qCritical() << "getAllData() SQL hatası:" << q.lastError().text();
-        return list;
+    if (!m_isReady) {
+        qWarning() << "DatabaseManager: Veritabanı henüz hazır değil";
+        emit dataLoaded(QVariantList());
+        return;
     }
 
-    while (q.next()) {
-        QVariantMap record;
-        record["first_name"] = q.value("first_name");
-        record["last_name"] = q.value("last_name");
-        record["spo2"] = q.value("spo2");
-        record["pr"] = q.value("pr");
-        record["timestamp"] = q.value("formatted_time");
-        list.append(record);
-    }
-
-    return list;
+    emit requestLoadAllData();
 }
 
-// FİLTRELENMİŞ VERİLERİ GÜVENLİ ŞEKİLDE DÖNDÜR
-QVariantList DatabaseManager::getFilteredData(int spo2Min, int spo2Max, int prMin, int prMax) const
+void DatabaseManager::loadFilteredData(int spo2Min, int spo2Max, int prMin, int prMax)
 {
-    QVariantList list;
-    QSqlQuery q(m_db);
-
-    QString queryString = "SELECT p.first_name, p.last_name, m.spo2, m.pr, "
-                          "strftime('%Y-%m-%d %H:%M:%S', m.timestamp) AS formatted_time "
-                          "FROM measurements m "
-                          "JOIN patients p ON m.patient_id = p.id "
-                          "WHERE 1=1 ";
-
-    if (spo2Min > 0) queryString += "AND m.spo2 >= :spo2Min ";
-    if (spo2Max > 0 && spo2Max <= 100) queryString += "AND m.spo2 <= :spo2Max ";
-    if (prMin > 0) queryString += "AND m.pr >= :prMin ";
-    if (prMax > 0 && prMax <= 300) queryString += "AND m.pr <= :prMax ";
-
-    queryString += "ORDER BY m.timestamp DESC";
-
-    q.prepare(queryString);
-
-    // Parametreleri güvenli şekilde bağla
-    if (spo2Min > 0) q.bindValue(":spo2Min", spo2Min);
-    if (spo2Max > 0 && spo2Max <= 100) q.bindValue(":spo2Max", spo2Max);
-    if (prMin > 0) q.bindValue(":prMin", prMin);
-    if (prMax > 0 && prMax <= 300) q.bindValue(":prMax", prMax);
-
-    if (!q.exec()) {
-        qWarning() << "getFilteredData SQL Error:" << q.lastError().text();
-        return list;
+    if (!m_isReady) {
+        qWarning() << "DatabaseManager: Veritabanı henüz hazır değil";
+        emit filteredDataLoaded(QVariantList());
+        return;
     }
 
-    while (q.next()) {
-        QVariantMap record;
-        record["first_name"] = q.value("first_name");
-        record["last_name"] = q.value("last_name");
-        record["spo2"] = q.value("spo2");
-        record["pr"] = q.value("pr");
-        record["timestamp"] = q.value("formatted_time");
-        list.append(record);
-    }
-
-    return list;
+    emit requestLoadFilteredData(spo2Min, spo2Max, prMin, prMax);
 }

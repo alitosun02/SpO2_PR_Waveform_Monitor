@@ -2,12 +2,11 @@
 #define DATABASEMANAGER_H
 
 #include <QObject>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QDebug>
+#include <QThread>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QMutex>
+#include "databaseworker.h"
 
 class DatabaseManager : public QObject
 {
@@ -17,20 +16,37 @@ public:
     explicit DatabaseManager(QObject *parent = nullptr);
     ~DatabaseManager();
 
-    bool addPatient(const QString &firstName, const QString &lastName, int &newPatientId);
+    // Async metodlar - thread'e istek gönderir
+    void addPatient(const QString &firstName, const QString &lastName);
     void saveMeasurement(int patientId, int spo2, int pr);
-    QVariantList getAllData() const;
+    void loadAllData();
+    void loadFilteredData(int spo2Min, int spo2Max, int prMin, int prMax);
 
-    // Yeni filtre fonksiyonları
-    QVariantList getFilteredData(int spo2Min, int spo2Max, int prMin, int prMax) const;
+    // Durum kontrolü
+    bool isReady() const { return m_isReady; }
 
-    // Veritabanı nesnesine erişim
-    QSqlDatabase& db() { return m_db; }
-    const QSqlDatabase& db() const { return m_db; }
+signals:
+    // DatabaseWorker'dan gelen sinyalleri dışarı aktar
+    void databaseReady();
+    void patientAdded(int newPatientId, bool success);
+    void measurementSaved(bool success);
+    void dataLoaded(const QVariantList &data);
+    void filteredDataLoaded(const QVariantList &data);
+    void error(const QString &message);
+
+    // Worker'a sinyal gönder
+    void initializeDatabase();
+    void requestAddPatient(const QString &firstName, const QString &lastName);
+    void requestSaveMeasurement(int patientId, int spo2, int pr);
+    void requestLoadAllData();
+    void requestLoadFilteredData(int spo2Min, int spo2Max, int prMin, int prMax);
 
 private:
-    QSqlDatabase m_db;
-    bool initializeDatabase();
+    QThread *m_workerThread;
+    DatabaseWorker *m_worker;
+    bool m_isReady;
+
+    void setupWorker();
 };
 
 #endif // DATABASEMANAGER_H
